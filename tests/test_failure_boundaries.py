@@ -148,11 +148,22 @@ def test_safe_open_failure_is_an_invalid_document(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = image_factory(tmp_path / "image.png", image_format="PNG")
+    real_open = os.open
 
-    def fail_open(_: object, __: int) -> int:
-        raise PermissionError("test denial")
+    def fail_source_open(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        if path == source:
+            raise PermissionError("test denial")
+        if dir_fd is None:
+            return real_open(path, flags, mode)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
 
-    monkeypatch.setattr("pagetrace.documents.ingestion.os.open", fail_open)
+    monkeypatch.setattr("pagetrace.documents.ingestion.os.open", fail_source_open)
     with pytest.raises(InvalidDocumentError, match="opened safely"):
         ingest_document(source, store=tmp_path / "store")
 
