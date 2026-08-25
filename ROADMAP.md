@@ -1,17 +1,20 @@
 # PageTrace Roadmap
 
 The roadmap grows PageTrace in evidence-driven increments. Milestone boundaries are plans, not
-claims of implemented functionality.
+claims of released functionality.
 
-## Milestone 0 — Project Foundation
+## Milestone 0 — Project Foundation (complete)
 
 Establish the typed Python package, build metadata, tests, coverage policy, quality tooling,
 continuous integration, and project policies required for responsible development.
 
-## Milestone 1 — Secure Deterministic Ingestion
+## Milestone 1 — Secure Deterministic Ingestion (implemented, pending acceptance)
 
 Define a bounded, reproducible ingestion boundary for untrusted documents, including validation,
 stable identity, safe paths, limits, and auditable page manifests.
+
+Implementation currently lives on `feat/milestone-1-ingestion` for architectural review. It is not
+marked as released. Milestone 2 work has not started.
 
 ## Milestone 2 — Text Extraction & OCR
 
@@ -67,4 +70,3 @@ and demonstrations grounded in real evidence.
 Advanced multimodal, vision-language-model, and chart intelligence is optional before v1.0. It
 should be introduced only when evaluated user needs and baseline limitations justify its added
 complexity, cost, and risk.
-
