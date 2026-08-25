@@ -50,12 +50,28 @@ After `python -m build`, create a fresh virtual environment, install the wheel f
 outside the source checkout, and run:
 
 ```bash
+python -m pip install dist/*.whl
 python -I -c "import pagetrace; print(pagetrace.__name__)"
+pagetrace --help
+python -I -m pagetrace --help
 ```
 
 The smoke test must use the wheel's interpreter and must not rely on an editable installation,
-`PYTHONPATH`, or the source checkout. The GitHub Actions workflow provides the canonical automated
+`PYTHONPATH`, or the source checkout. Installing the wheel must resolve its declared pypdf and
+Pillow runtime dependencies. The GitHub Actions workflow provides the canonical automated
 implementation of this check.
+
+## Document-ingestion changes
+
+Document fixtures should be tiny and generated programmatically where practical. Tests involving
+untrusted documents must exercise real parser/storage behavior and relevant failure cases rather
+than mocking away the ingestion boundary. Preserve deterministic manifests: do not add source
+paths, filenames, timestamps, machine identity, or other environment-derived values to the
+canonical artifact.
+
+Milestone 1 runtime dependencies are intentionally limited to pypdf (BSD-3-Clause) for PDF
+structure inspection and Pillow (MIT-CMU) for PNG/JPEG validation and metadata. New runtime
+dependencies require a documented capability need and license review.
 
 ## Git hygiene
 
@@ -66,4 +82,3 @@ implementation of this check.
 - Update documentation and the `[Unreleased]` changelog when behavior or contributor workflow
   changes.
 - Do not bypass branch protections or publish packages from a development branch.
-
