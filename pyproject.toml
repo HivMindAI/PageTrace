@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "pagetrace"
 version = "0.1.0.dev0"
-description = "Foundation for a provenance-first multimodal document intelligence platform."
+description = "Secure deterministic ingestion for provenance-first document intelligence."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
@@ -21,7 +21,13 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+  "Pillow>=11,<13",
+  "pypdf>=6,<7",
+]
+
+[project.scripts]
+pagetrace = "pagetrace.cli:main"
 
 [project.optional-dependencies]
 dev = [

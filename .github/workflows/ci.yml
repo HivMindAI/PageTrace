@@ -73,7 +73,9 @@ jobs:
         shell: bash
         run: |
           python -m venv "${RUNNER_TEMP}/pagetrace-wheel"
-          "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -m pip install --no-deps dist/*.whl
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -m pip install dist/*.whl
           cd "${RUNNER_TEMP}"
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -c \
             "import pagetrace; print(pagetrace.__name__, pagetrace.__file__)"
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" --help
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace --help

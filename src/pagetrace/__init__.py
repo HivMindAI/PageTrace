@@ -1,4 +1,4 @@
-"""PageTrace package foundation."""
+"""PageTrace document ingestion package."""
 
 __all__ = ["__version__"]
 
