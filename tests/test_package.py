@@ -2,11 +2,13 @@ from importlib import resources
 from importlib.metadata import version
 
 import pagetrace
+import pagetrace.extraction
 
 
 def test_package_imports() -> None:
     """The installed top-level package is importable."""
     assert pagetrace.__name__ == "pagetrace"
+    assert pagetrace.extraction.__name__ == "pagetrace.extraction"
 
 
 def test_package_version_matches_distribution_metadata() -> None:

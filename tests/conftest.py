@@ -1,9 +1,10 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import pytest
 from PIL import Image
 from pypdf import PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 
 @pytest.fixture
@@ -14,6 +15,11 @@ def pdf_factory() -> "PdfFactory":
 @pytest.fixture
 def image_factory() -> "ImageFactory":
     return ImageFactory()
+
+
+@pytest.fixture
+def text_pdf_factory() -> "TextPdfFactory":
+    return TextPdfFactory()
 
 
 class PdfFactory:
@@ -50,4 +56,33 @@ class ImageFactory:
     ) -> Path:
         image = Image.new("RGB", size, color=(20, 40, 60))
         image.save(path, format=image_format)
+        return path
+
+
+class TextPdfFactory:
+    def __call__(self, path: Path, texts: Sequence[str | None]) -> Path:
+        writer = PdfWriter()
+        font = DictionaryObject(
+            {
+                NameObject("/Type"): NameObject("/Font"),
+                NameObject("/Subtype"): NameObject("/Type1"),
+                NameObject("/BaseFont"): NameObject("/Helvetica"),
+                NameObject("/Encoding"): NameObject("/WinAnsiEncoding"),
+            }
+        )
+        font_reference = writer._add_object(font)
+        for text in texts:
+            page = writer.add_blank_page(width=200, height=200)
+            if text is None:
+                continue
+            resources = DictionaryObject(
+                {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font_reference})}
+            )
+            stream = DecodedStreamObject()
+            escaped = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+            stream.set_data(f"BT /F1 12 Tf 10 100 Td ({escaped}) Tj ET".encode("ascii"))
+            page[NameObject("/Resources")] = resources
+            page[NameObject("/Contents")] = writer._add_object(stream)
+        with path.open("wb") as output:
+            writer.write(output)
         return path

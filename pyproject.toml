@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "pagetrace"
 version = "0.1.0.dev0"
-description = "Secure deterministic ingestion for provenance-first document intelligence."
+description = "Deterministic ingestion and text extraction for provenance-first documents."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"

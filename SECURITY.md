@@ -1,8 +1,9 @@
 # Security Policy
 
 PageTrace is designed for documents that may be malformed, adversarial, sensitive, or simply
-unexpected. Milestone 1 implements a bounded local ingestion boundary for PDF, PNG, and JPEG on the
-`feat/milestone-1-ingestion` branch. It does **not** provide complete document sandboxing.
+unexpected. Milestone 1 implements the accepted bounded local ingestion boundary for PDF, PNG, and
+JPEG. Milestone 2A adds in-process embedded PDF text extraction and explicit OCR-candidate routing
+on `feat/milestone-2a-text-extraction`. Neither stage provides complete document sandboxing.
 
 ## Implemented Milestone 1 protections
 
@@ -31,9 +32,39 @@ corruption, stored-source tampering, deterministic re-ingestion, and cleanup. Sy
 only on platforms or accounts that do not permit creating the test link; production rejection is
 unconditional.
 
+## Implemented Milestone 2A protections
+
+- Extraction accepts only a canonical document ID already persisted and verified by Milestone 1;
+  there is no arbitrary-file extraction bypass.
+- The source is fingerprint-verified before processing. PDF bytes are opened without following a
+  symbolic link where the platform supports it, rehashed from the opened handle, and compared with
+  the immutable document manifest before pypdf receives them.
+- Page results retain the exact Milestone 1 document fingerprint, document ID, page IDs, and
+  contiguous page numbers.
+- Embedded text is preserved as returned by pypdf. Status is stored separately from text, and
+  OCR-candidate pages never contain placeholder or fabricated OCR output.
+- Typed output limits accept at most 2,000,000 extracted characters per page and 20,000,000 per
+  document by default. Limits are inclusive, configurable through the Python API, enforced after
+  every page extraction, and violations fail before artifact persistence without truncation.
+- The deterministic routing threshold, extraction mode, and both output limits are captured in
+  configuration and artifact identity. The extractor-stage version and actual installed pypdf
+  version also participate.
+- Frozen schema-v1 text artifacts use canonical UTF-8 JSON and a canonical page-content checksum.
+  Unsafe artifact IDs, unknown schemas, malformed values, inconsistent status/text, and identity,
+  page, fingerprint, or content contradictions are rejected.
+- Text artifacts are stored under system-derived paths separate from the immutable source and
+  ingestion manifest. Complete temporary files are flushed and promoted without overwriting an
+  existing artifact; failed promotions clean up temporary files.
+- Every text-artifact read re-verifies the underlying Milestone 1 source. Source tampering therefore
+  invalidates both new extraction and existing extraction-artifact readback.
+
+Text extracted from a document remains untrusted data. PageTrace does not execute embedded
+commands, URLs, scripts, model instructions, or prompt-injection text. Milestone 2A does not pass
+document text to a shell, browser, model, service, or other execution environment.
+
 ## Security principles
 
-- Treat every document and all future extracted content as untrusted data.
+- Treat every document and all extracted content as untrusted data.
 - Never treat document text as executable instructions, even when it resembles system, developer,
   tool, or user directions.
 - Apply least privilege, explicit resource limits, deterministic processing, and auditable
@@ -43,12 +74,15 @@ unconditional.
 
 ## Residual risks and future security work
 
-Milestone 1 is an in-process parser boundary, not an operating-system sandbox. Residual risks
-include vulnerabilities or pathological CPU/memory behavior in pypdf, Pillow, Python, or native
-image codecs; deeply nested PDF object graphs; filesystem exhaustion; storage-root tampering by a
-separate privileged process; and source mutation races that preserve observable file attributes.
-The bounded staging design detects common mutation and limits byte retention, but cannot solve all
-denial-of-service or local adversary scenarios.
+Milestones 1 and 2A are in-process parser boundaries, not operating-system sandboxes. Residual risks
+include vulnerabilities or pathological CPU/memory behavior in pypdf text/content-stream parsing,
+Pillow, Python, or native image codecs; very large decompressed text streams; deeply nested PDF
+object graphs; filesystem exhaustion; storage-root tampering by a separate privileged process; and
+source/storage mutation races. Existing byte/page/pixel bounds and repeated fingerprint checks
+reduce exposure but cannot solve every denial-of-service or local-adversary scenario. Extraction
+character limits bound accepted page output and cumulative canonical artifact size only after
+`extract_text` returns. Malicious compressed/content streams may consume pypdf CPU or RAM before
+that check. Milestone 2A does not claim CPU, memory, time, subprocess, or parser isolation.
 
 Future threat modeling and milestones will cover at least:
 
@@ -60,9 +94,10 @@ Future threat modeling and milestones will cover at least:
 - confidential, regulated, or personally identifiable content; and
 - unintended exposure to future external model or service providers.
 
-Prompt injection and model-provider disclosure are future concerns because Milestone 1 does not
-extract document text or call models/services. Process isolation, broader quotas, privacy controls,
-supply-chain hardening, and operational incident controls remain later roadmap responsibilities.
+Prompt injection is already a data-handling concern because Milestone 2A extracts untrusted text,
+but no model or external service consumes that text yet. Model-provider disclosure, process
+isolation, broader quotas, privacy controls, supply-chain hardening, and operational incident
+controls remain later roadmap responsibilities.
 
 ## Supported versions
 

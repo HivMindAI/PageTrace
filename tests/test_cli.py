@@ -5,7 +5,10 @@ from pathlib import Path
 
 import pytest
 
+import pagetrace.cli
 from pagetrace.cli import build_parser, main
+from pagetrace.documents import ingest_document
+from pagetrace.extraction import ExtractionLimitError
 from tests.conftest import ImageFactory
 
 
@@ -60,3 +63,91 @@ def test_cli_parser_requires_a_command() -> None:
     with pytest.raises(SystemExit) as error:
         build_parser().parse_args([])
     assert error.value.code == 2
+
+
+def test_cli_extract_and_inspect_text_plain_output(
+    tmp_path: Path,
+    image_factory: ImageFactory,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    store = tmp_path / "store"
+    manifest = ingest_document(
+        image_factory(tmp_path / "image.png", image_format="PNG"), store=store
+    )
+
+    assert main(["extract-text", manifest.document_id, "--store", str(store)]) == 0
+    extraction_output = capsys.readouterr().out
+    artifact_id = extraction_output.splitlines()[0].split(": ", 1)[1]
+    assert f"document id: {manifest.document_id}" in extraction_output
+    assert "page 1: ocr_candidate (0 non-whitespace characters)" in extraction_output
+
+    assert (
+        main(
+            [
+                "inspect-text",
+                manifest.document_id,
+                artifact_id,
+                "--store",
+                str(store),
+            ]
+        )
+        == 0
+    )
+    assert f"text artifact id: {artifact_id}" in capsys.readouterr().out
+
+
+def test_cli_text_json_output_separates_status_and_absent_text(
+    tmp_path: Path,
+    image_factory: ImageFactory,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    store = tmp_path / "store"
+    manifest = ingest_document(
+        image_factory(tmp_path / "image.jpg", image_format="JPEG"), store=store
+    )
+
+    assert main(["extract-text", manifest.document_id, "--store", str(store), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["pages"][0]["status"] == "ocr_candidate"
+    assert payload["pages"][0]["text"] is None
+    assert "OCR required" not in json.dumps(payload)
+
+
+def test_cli_text_domain_failure_has_no_traceback(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    missing_id = f"sha256-{'0' * 64}"
+
+    assert main(["extract-text", missing_id, "--store", str(tmp_path / "store")]) == 2
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.startswith("pagetrace: error:")
+    assert "Traceback" not in captured.err
+
+
+def test_cli_does_not_swallow_unexpected_extraction_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_unexpectedly(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("programmer failure")
+
+    monkeypatch.setattr(pagetrace.cli, "extract_document_text", fail_unexpectedly)
+    with pytest.raises(RuntimeError, match="programmer failure"):
+        main(["extract-text", f"sha256-{'0' * 64}"])
+
+
+def test_cli_extraction_limit_failure_is_concise(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def exceed_limit(*_args: object, **_kwargs: object) -> None:
+        raise ExtractionLimitError("test output exceeds configured extraction limit")
+
+    monkeypatch.setattr(pagetrace.cli, "extract_document_text", exceed_limit)
+
+    assert main(["extract-text", f"sha256-{'0' * 64}"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ("pagetrace: error: test output exceeds configured extraction limit\n")
+    assert "Traceback" not in captured.err

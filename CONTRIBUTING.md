@@ -53,7 +53,9 @@ outside the source checkout, and run:
 python -m pip install dist/*.whl
 python -I -c "import pagetrace; print(pagetrace.__name__)"
 pagetrace --help
+pagetrace extract-text --help
 python -I -m pagetrace --help
+python -I -m pagetrace extract-text --help
 ```
 
 The smoke test must use the wheel's interpreter and must not rely on an editable installation,
@@ -72,6 +74,34 @@ canonical artifact.
 Milestone 1 runtime dependencies are intentionally limited to pypdf (BSD-3-Clause) for PDF
 structure inspection and Pillow (MIT-CMU) for PNG/JPEG validation and metadata. New runtime
 dependencies require a documented capability need and license review.
+
+## Text-extraction changes
+
+Extraction must begin from a stored document that passes Milestone 1 readback. Do not add a direct
+arbitrary-file extraction path or mutate the canonical ingestion manifest/source. Text artifacts
+are separate derived values with deterministic identity, immutable page results, explicit
+extractor/configuration provenance, atomic persistence, and verified readback.
+
+Use real tiny generated PDFs for primary embedded-text and mixed-page behavior. Narrow mocks are
+appropriate only for parser/storage failure boundaries. Preserve pypdf output faithfully; do not
+normalize case, punctuation, whitespace, accents, or language direction. An OCR-candidate status
+must have no invented text. Milestone 2A intentionally has no OCR engine, model download, PDF page
+renderer, image preprocessing, layout analysis, retrieval, RAG, or model integration.
+
+Every extraction configuration must retain positive typed per-page and per-document character
+limits. Defaults are 2,000,000 and 20,000,000 respectively, with inclusive acceptance. Enforce
+limits page-by-page before accepting results; never truncate, convert a violation into an OCR
+candidate, or persist a partial artifact. Limits belong in deterministic provenance and artifact
+identity. Tests should use deliberately small values for boundary and cumulative behavior.
+
+`SPARSE_EMBEDDED_TEXT` means pypdf returned text below the configured sufficiency threshold. It is
+not a resolved-quality claim and remains eligible for future OCR routing/evaluation policy.
+Character limits bound accepted output after pypdf returns; they do not sandbox its CPU or memory
+use. pypdf remains in-process without subprocess, time, or memory isolation.
+
+pypdf is reused for embedded text, so Milestone 2A adds no runtime dependency. A future OCR engine
+or other new runtime dependency requires separate capability, security, license, size, and
+evaluation review.
 
 ## Git hygiene
 
