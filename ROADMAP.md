@@ -8,18 +8,25 @@ claims of released functionality.
 Establish the typed Python package, build metadata, tests, coverage policy, quality tooling,
 continuous integration, and project policies required for responsible development.
 
-## Milestone 1 — Secure Deterministic Ingestion (implemented, pending acceptance)
+## Milestone 1 — Secure Deterministic Ingestion (complete)
 
 Define a bounded, reproducible ingestion boundary for untrusted documents, including validation,
 stable identity, safe paths, limits, and auditable page manifests.
 
-Implementation currently lives on `feat/milestone-1-ingestion` for architectural review. It is not
-marked as released. Milestone 2 work has not started.
+The accepted implementation is merged on `main`. It remains unreleased while later development
+milestones continue.
 
-## Milestone 2 — Text Extraction & OCR
+## Milestone 2A — Deterministic Text Extraction & OCR Routing (implementation pending acceptance)
 
-Add measured text extraction and OCR paths with explicit fallback behavior, confidence signals,
-and fixtures covering representative document quality.
+Extract embedded PDF text with deterministic provenance and immutable derived artifacts. Route
+pages with no usable embedded text, sparse embedded text, and image documents explicitly for
+future OCR consideration without fabricating OCR output.
+
+## Milestone 2B — OCR Engine & Evaluation (planned)
+
+Select and integrate a real OCR engine, render only routed pages, and establish representative OCR
+fixtures and measured evaluation. Engine choice, model downloads, image preprocessing, language
+coverage, and OCR accuracy claims belong here rather than Milestone 2A.
 
 ## Milestone 3 — Structured Document Representation
 

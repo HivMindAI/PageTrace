@@ -27,3 +27,18 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 - pypdf and Pillow as the only runtime dependencies required for supported-format validation.
 - Behavioral and security tests covering limits, traversal, malformed/encrypted content,
   deterministic identity, persistence integrity, cleanup, and CLI behavior.
+- Deterministic pypdf embedded-text extraction for verified stored PDFs with faithful text
+  preservation and page-level embedded, sparse, and OCR-candidate routing.
+- Explicit PNG/JPEG OCR-candidate artifacts that contain no fabricated OCR text and do not re-encode
+  or preprocess the validated image.
+- Immutable schema-v1 text extraction artifacts with document/page fingerprint linkage, real pypdf
+  version provenance, configuration-derived identities, canonical UTF-8 JSON, and content checksums.
+- Typed, configurable extraction output limits with inclusive defaults of 2,000,000 characters per
+  page and 20,000,000 per document, deterministic provenance, explicit limit errors, and no partial
+  artifact or silent truncation on rejection.
+- Separate atomic text-artifact persistence, idempotent repeated extraction, contradiction
+  detection, and readback that re-verifies the underlying Milestone 1 source.
+- Typed extraction/readback Python APIs plus `pagetrace extract-text` and
+  `pagetrace inspect-text` commands with human-readable and canonical JSON output.
+- Behavioral, mixed-PDF, determinism, provenance, corruption, cleanup, source-tampering, strict
+  schema, and CLI tests for the Milestone 2A boundary.
