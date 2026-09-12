@@ -1,4 +1,4 @@
-"""PageTrace document ingestion package."""
+"""PageTrace provenance-first document processing package."""
 
 __all__ = ["__version__"]
 

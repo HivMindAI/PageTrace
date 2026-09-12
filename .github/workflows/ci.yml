@@ -76,6 +76,8 @@ jobs:
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -m pip install dist/*.whl
           cd "${RUNNER_TEMP}"
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -c \
-            "import pagetrace; print(pagetrace.__name__, pagetrace.__file__)"
+            "import pagetrace, pagetrace.extraction; print(pagetrace.__name__, pagetrace.__file__)"
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" --help
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" extract-text --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace --help
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace extract-text --help
