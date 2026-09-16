@@ -8,6 +8,7 @@ import pytest
 from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
+import pagetrace.structure.layout as structure_layout
 from pagetrace.documents import MediaType, ingest_document
 from pagetrace.structure import (
     DEFAULT_STRUCTURE_CONFIG,
@@ -222,7 +223,7 @@ def test_extract_pdf_layout_reports_import_and_parser_failures(
     def _missing(_name: str) -> object:
         raise ImportError
 
-    monkeypatch.setattr("pagetrace.structure.layout.importlib.import_module", _missing)
+    monkeypatch.setattr(structure_layout, "importlib", SimpleNamespace(import_module=_missing))
     with pytest.raises(StructureDependencyError, match=r"structure.*extra"):
         extract_pdf_layout(source.read_bytes(), manifest, DEFAULT_STRUCTURE_CONFIG)
 
@@ -230,8 +231,9 @@ def test_extract_pdf_layout_reports_import_and_parser_failures(
         raise OSError
 
     monkeypatch.setattr(
-        "pagetrace.structure.layout.importlib.import_module",
-        lambda _name: SimpleNamespace(open=_failed_open),
+        structure_layout,
+        "importlib",
+        SimpleNamespace(import_module=lambda _name: SimpleNamespace(open=_failed_open)),
     )
     with pytest.raises(StructureProcessingError, match="could not extract"):
         extract_pdf_layout(source.read_bytes(), manifest, DEFAULT_STRUCTURE_CONFIG)
@@ -308,7 +310,11 @@ def _install_pdfplumber(
     pages: list[object],
 ) -> None:
     module = SimpleNamespace(open=lambda _source: _Context(pages))
-    monkeypatch.setattr("pagetrace.structure.layout.importlib.import_module", lambda _name: module)
+    monkeypatch.setattr(
+        structure_layout,
+        "importlib",
+        SimpleNamespace(import_module=lambda _name: module),
+    )
 
 
 def _write_table_pdf(path: Path) -> Path:
