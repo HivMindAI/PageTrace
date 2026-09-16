@@ -31,6 +31,7 @@ def test_real_rapidocr_uses_bundled_models_and_cpu_backend() -> None:
 
     assert " ".join(result.lines) == "PAGETRACE 2026"
     assert all(confidence > 0.9 for confidence in result.confidences)
+    assert len(result.boxes) == len(result.lines)
     assert descriptor.engine_name == "rapidocr"
     assert descriptor.inference_backend_name == "onnxruntime"
     assert descriptor.inference_profile == "cpu-single-thread"
@@ -136,6 +137,13 @@ def test_bundled_model_discovery_rejects_missing_or_ambiguous_package(
 
 
 def _engine_with_output(output: object) -> RapidOcrEngine:
+    if isinstance(output, SimpleNamespace) and not hasattr(output, "boxes"):
+        if output.txts is None and output.scores is None:
+            output.boxes = None
+        else:
+            lines = output.txts if isinstance(output.txts, tuple) else ()
+            output.boxes = tuple(((0, 0), (1, 0), (1, 1), (0, 1)) for _line in lines)
+
     def return_output(_data: bytes) -> object:
         return output
 

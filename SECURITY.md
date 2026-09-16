@@ -3,8 +3,9 @@
 PageTrace is designed for documents that may be malformed, adversarial, sensitive, or simply
 unexpected. Milestone 1 implements the accepted bounded local ingestion boundary for PDF, PNG, and
 JPEG. Milestone 2A adds in-process embedded PDF text extraction and explicit OCR-candidate routing.
-Milestone 2B adds bounded, routed PDFium rendering and RapidOCR inference. None of these stages
-provides complete document sandboxing.
+Milestone 2B adds bounded, routed PDFium rendering and RapidOCR inference. Milestone 3 adds
+pdfplumber layout/table parsing and deterministic OCR geometry replay. None of these stages provides
+complete document sandboxing.
 
 ## Implemented Milestone 1 protections
 
@@ -81,6 +82,23 @@ document text to a shell, browser, model, service, or other execution environmen
 - Evaluation compares caller-provided UTF-8 strings exactly and reports exact match, character
   error rate, and word error rate without hidden normalization or an accuracy claim.
 
+## Implemented Milestone 3 protections
+
+- Structure construction requires one verified document, text-routing artifact, and OCR artifact;
+  the OCR artifact must derive from the selected text artifact.
+- PDF words, tables, and cells use finite, bounded top-left coordinates checked against verified
+  display dimensions. Image/OCR coordinates use verified pixel dimensions.
+- OCR geometry is accepted only after replaying the exact recorded processor/configuration and
+  matching the stored page text, line count, and rounded mean confidence.
+- Typed limits cap spans per page/document, tables per page/document, and cells per table/document.
+  Violations fail before persistence without truncation or partial artifacts.
+- Canonical schema-v1 structure artifacts include exact prior-stage content fingerprints,
+  processor/backend versions, configuration, content checksums, atomic no-overwrite persistence,
+  strict readback, and full provenance re-verification.
+
+Line-based table detection and OCR geometry remain untrusted derived data. Coordinates establish
+traceable regions, not semantic correctness or reading-order accuracy.
+
 ## Security principles
 
 - Treat every document and all extracted content as untrusted data.
@@ -93,17 +111,19 @@ document text to a shell, browser, model, service, or other execution environmen
 
 ## Residual risks and future security work
 
-Milestones 1, 2A, and 2B are in-process parser/inference boundaries, not operating-system sandboxes. Residual risks
-include vulnerabilities or pathological CPU/memory behavior in pypdf text/content-stream parsing,
-Pillow, Python, or native image codecs; very large decompressed text streams; deeply nested PDF
-object graphs; filesystem exhaustion; storage-root tampering by a separate privileged process; and
+Milestones 1 through 3 are in-process parser/inference boundaries, not operating-system sandboxes.
+Residual risks include vulnerabilities or pathological CPU/memory behavior in pypdf and
+pdfplumber text/content-stream/layout parsing, Pillow, Python, or native image codecs; very large
+decompressed text streams; deeply nested PDF object graphs; filesystem exhaustion; storage-root
+tampering by a separate privileged process; and
 source/storage mutation races. Existing byte/page/pixel bounds and repeated fingerprint checks
 reduce exposure but cannot solve every denial-of-service or local-adversary scenario. Extraction
 character limits bound accepted page output and cumulative canonical artifact size only after
 `extract_text` returns. Malicious compressed/content streams may consume pypdf CPU or RAM before
 that check. OCR pixel preflight does not prevent malicious PDFium, image-codec, RapidOCR, OpenCV,
 or ONNX Runtime inputs from consuming CPU or memory before returning. OCR line and character limits
-apply after inference. PageTrace does not claim CPU, memory, time, subprocess, parser, or inference
+apply after inference. Structure span/table/cell limits apply after parser or inference work has
+returned data. PageTrace does not claim CPU, memory, time, subprocess, parser, or inference
 isolation.
 
 Future threat modeling and milestones will cover at least:

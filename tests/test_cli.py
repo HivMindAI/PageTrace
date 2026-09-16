@@ -10,7 +10,9 @@ from pagetrace.cli import build_parser, main
 from pagetrace.documents import ingest_document
 from pagetrace.extraction import ExtractionLimitError, extract_document_text
 from pagetrace.ocr import OcrEvaluationError
+from pagetrace.structure import StructureProcessingError
 from tests.conftest import ImageFactory
+from tests.test_structure_models import _artifact as structured_artifact
 
 
 def test_cli_ingest_and_inspect_plain_output(
@@ -245,3 +247,81 @@ def test_cli_evaluation_input_failures_are_concise(
 def test_cli_evaluation_rejects_non_regular_input(tmp_path: Path) -> None:
     with pytest.raises(OcrEvaluationError, match="regular"):
         pagetrace.cli._read_evaluation_text(tmp_path)
+
+
+def test_cli_structure_and_inspection_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    artifact = structured_artifact()
+    monkeypatch.setattr(
+        pagetrace.cli,
+        "structure_document",
+        lambda *_args, **_kwargs: artifact,
+    )
+
+    assert (
+        main(
+            [
+                "structure",
+                artifact.document_id,
+                artifact.source_text_artifact_id,
+                artifact.source_ocr_artifact_id,
+                "--store",
+                str(tmp_path),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert f"structured artifact id: {artifact.artifact_id}" in output
+    assert "positioned text spans: 1" in output
+    assert "tables: 1" in output
+
+    monkeypatch.setattr(
+        pagetrace.cli,
+        "load_structured_document",
+        lambda *_args, **_kwargs: artifact,
+    )
+    assert (
+        main(
+            [
+                "inspect-structure",
+                artifact.document_id,
+                artifact.artifact_id,
+                "--store",
+                str(tmp_path),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["artifact_id"] == artifact.artifact_id
+    assert payload["pages"][0]["coordinate_origin"] == "top_left"
+
+
+def test_cli_structure_failure_is_concise(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise StructureProcessingError("structure failed safely")
+
+    monkeypatch.setattr(pagetrace.cli, "structure_document", fail)
+
+    assert (
+        main(
+            [
+                "structure",
+                f"sha256-{'1' * 64}",
+                f"text-sha256-{'2' * 64}",
+                f"ocr-sha256-{'3' * 64}",
+            ]
+        )
+        == 2
+    )
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == "pagetrace: error: structure failed safely\n"

@@ -17,27 +17,31 @@ PageTrace is guided by four ideas:
 ## Current status
 
 PageTrace is **pre-alpha**. Milestones 0, 1, and 2A are complete. Milestone 2B routed OCR and
-evaluation is implemented on a development branch and pending acceptance. The current package can:
+evaluation and Milestone 3 structured representation are implemented on a development branch and
+pending acceptance. The current package can:
 
 - stage untrusted local PDF, PNG, and JPEG files under explicit byte/page/pixel limits;
 - identify supported media from content signatures and confirm it with pypdf or Pillow;
 - compute full SHA-256 content fingerprints and deterministic document/page identities;
-- persist canonical immutable manifests and the exact validated source bytes atomically; and
+- persist canonical immutable manifests and the exact validated source bytes atomically;
 - verify manifest structure, identity, source size, and source fingerprint during readback;
 - extract embedded PDF text with pypdf while preserving the returned text;
 - reject extracted output above typed per-page and per-document character limits;
 - route PDF pages with no usable embedded text and all PNG/JPEG pages as explicit OCR candidates;
-- represent mixed digital/scanned-style PDFs with independent page-level states; and
+- represent mixed digital/scanned-style PDFs with independent page-level states;
 - persist deterministic, versioned text artifacts separately from immutable ingestion manifests;
 - render only OCR-candidate and policy-eligible sparse pages using PDFium;
 - recognize routed page images with bundled RapidOCR PP-OCR models on CPU ONNX Runtime;
-- persist immutable OCR artifacts linked to both document and text-routing provenance; and
-- measure exact match, character error rate, and word error rate without hidden normalization.
+- persist immutable OCR artifacts linked to both document and text-routing provenance;
+- measure exact match, character error rate, and word error rate without hidden normalization;
+- position embedded PDF words and replay-verified OCR lines in explicit top-left coordinates;
+- detect line-delimited PDF tables and preserve positioned cells; and
+- persist immutable structured artifacts linked to the exact document, text, and OCR artifacts.
 
 An OCR-candidate status remains routing information rather than proof that OCR is necessary or
 accurate. OCR output is untrusted derived data with measured confidence, not verified truth.
-PageTrace does not analyze layout, extract tables, chunk or index content, perform retrieval/RAG,
-use language/vision models, or answer questions.
+PageTrace does not yet chunk or index content, perform retrieval/RAG, use language/vision models,
+or answer questions. Table extraction is limited to deterministic line-based PDF detection.
 
 ## Planned conceptual pipeline
 
@@ -49,6 +53,8 @@ secure deterministic ingestion (Milestone 1 complete)
 embedded PDF text + explicit OCR routing (Milestone 2A complete)
         |
 real OCR engine and measured OCR evaluation (Milestone 2B pending acceptance)
+        |
+positioned text and line-based PDF tables (Milestone 3 pending acceptance)
         |
 provenance-aware corpus construction (planned)
         |
@@ -68,11 +74,13 @@ python -m venv .venv
 # Linux/macOS: source .venv/bin/activate
 # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -e ".[dev,ocr]"
+python -m pip install -e ".[dev,ocr,structure]"
 ```
 
 The base install remains sufficient for ingestion and Milestone 2A extraction. Install the `ocr`
-extra only when running Milestone 2B OCR; it adds RapidOCR, CPU ONNX Runtime, and pypdfium2.
+extra only when running Milestone 2B OCR; it adds RapidOCR, CPU ONNX Runtime, and pypdfium2. The
+`structure` extra adds pdfplumber for positioned PDF words and line-based table detection. OCR
+geometry replay also requires the `ocr` extra when the selected OCR artifact contains routed pages.
 
 ## Python API
 
@@ -82,6 +90,7 @@ from pathlib import Path
 from pagetrace.documents import ingest_document, load_document
 from pagetrace.extraction import extract_document_text, load_text_extraction
 from pagetrace.ocr import evaluate_ocr, load_ocr_artifact, ocr_document
+from pagetrace.structure import load_structured_document, structure_document
 
 manifest = ingest_document(Path("annual-report.pdf"), store=Path(".pagetrace"))
 loaded = load_document(manifest.document_id, store=Path(".pagetrace"))
@@ -111,6 +120,21 @@ assert (
 
 evaluation = evaluate_ocr("expected text", ocr_artifact.pages[0].text or "")
 print(evaluation.character_error_rate, evaluation.word_error_rate)
+
+structured = structure_document(
+    manifest.document_id,
+    artifact.artifact_id,
+    ocr_artifact.artifact_id,
+    store=Path(".pagetrace"),
+)
+assert (
+    load_structured_document(
+        structured.artifact_id,
+        document_id=manifest.document_id,
+        store=Path(".pagetrace"),
+    )
+    == structured
+)
 ```
 
 Expected document failures derive from `DocumentError`. More specific public errors distinguish
@@ -177,6 +201,14 @@ native pixels. Defaults allow at most 100 selected pages, 25 million pixels per 
 pixels per document, 1,000 detected lines per page, 2 million OCR characters per page, and 20
 million OCR characters per document. Violations fail without truncation or partial persistence.
 
+Milestone 3 emits display-oriented, top-left coordinates: PDF pages use points and image pages use
+pixels. Embedded PDF text is represented as positioned words. OCR-selected pages are rendered and
+recognized again with the exact processor and configuration recorded by the source OCR artifact;
+text, line count, and mean confidence must match before geometry is accepted. Defaults allow at
+most 100,000 text spans per page, 1,000,000 spans per document, 100 tables per page, 1,000 tables
+per document, 10,000 cells per table, and 100,000 cells per document. Violations fail without
+partial persistence.
+
 ## CLI
 
 ```bash
@@ -190,6 +222,11 @@ pagetrace ocr sha256-<64-lowercase-hex-characters> \
 pagetrace inspect-ocr sha256-<64-lowercase-hex-characters> \
   ocr-sha256-<64-lowercase-hex-characters> --store .pagetrace
 pagetrace evaluate-ocr reference.txt prediction.txt --json
+pagetrace structure sha256-<64-lowercase-hex-characters> \
+  text-sha256-<64-lowercase-hex-characters> \
+  ocr-sha256-<64-lowercase-hex-characters> --store .pagetrace
+pagetrace inspect-structure sha256-<64-lowercase-hex-characters> \
+  structure-sha256-<64-lowercase-hex-characters> --store .pagetrace --json
 
 # The module entry point is equivalent.
 python -m pagetrace ingest annual-report.pdf --store .pagetrace --json
@@ -197,8 +234,8 @@ python -m pagetrace ingest annual-report.pdf --store .pagetrace --json
 
 Plain output reports document or artifact identity, provenance, page counts, and per-page routing.
 `--json` emits the relevant canonical manifest, artifact, or metric object. Expected document,
-extraction, OCR, and evaluation errors are concise, have a non-zero exit status, and do not display
-a traceback.
+extraction, OCR, evaluation, and structure errors are concise, have a non-zero exit status, and do
+not display a traceback.
 
 ## Artifact and identity design
 
@@ -214,8 +251,10 @@ STORE/
         `-- artifacts/
             |-- text/
             |   `-- text-sha256-<full-digest>.json
-            `-- ocr/
-                `-- ocr-sha256-<full-digest>.json
+            |-- ocr/
+            |   `-- ocr-sha256-<full-digest>.json
+            `-- structure/
+                `-- structure-sha256-<full-digest>.json
 ```
 
 The canonical manifest uses schema version `1`, stable UTF-8 JSON serialization, a full SHA-256
@@ -242,6 +281,13 @@ version, installed RapidOCR/ONNX Runtime/PDFium versions, and SHA-256 of the thr
 files. Page results record source routing status, whether OCR ran, rendered dimensions, exact OCR
 text, bounded counts, and rounded mean line confidence. Readback re-verifies every provenance link.
 
+Structured artifacts use schema version `1` and derive identity from the document fingerprint,
+exact source text and OCR artifact identities/content fingerprints, structure configuration, and
+installed pdfplumber version for PDFs. Page results preserve source page IDs, coordinate units,
+rotation, positioned text spans, detected table grids, and cells. Canonical content is checksummed,
+promoted atomically without overwriting contradictions, and revalidated against all three earlier
+stages during readback.
+
 ## Security boundary and limits
 
 Milestone 1 rejects missing paths, directories, symbolic-link inputs, empty/unsupported/malformed
@@ -262,6 +308,11 @@ rendering, and line/text limits are checked after RapidOCR returns. RapidOCR, ON
 PDFium, and image codecs still run in-process without hard CPU, memory, or wall-clock isolation.
 The bundled models avoid runtime model downloads, but optional dependency installation remains a
 supply-chain operation.
+
+Structure limits bound accepted spans, tables, and cells only after pdfplumber or OCR inference
+returns. pdfplumber and OCR geometry replay remain in-process without hard CPU, memory, or
+wall-clock isolation. Line-based table detection is a parser result, not a semantic guarantee that
+a detected grid is correct.
 
 All extracted text remains untrusted document data. PageTrace does not execute embedded commands,
 scripts, URLs, or instruction-like text, and no extracted content should be treated as a system or

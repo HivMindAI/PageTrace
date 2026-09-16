@@ -4,6 +4,7 @@ from importlib.metadata import version
 import pagetrace
 import pagetrace.extraction
 import pagetrace.ocr
+import pagetrace.structure
 
 
 def test_package_imports() -> None:
@@ -11,6 +12,7 @@ def test_package_imports() -> None:
     assert pagetrace.__name__ == "pagetrace"
     assert pagetrace.extraction.__name__ == "pagetrace.extraction"
     assert pagetrace.ocr.__name__ == "pagetrace.ocr"
+    assert pagetrace.structure.__name__ == "pagetrace.structure"
 
 
 def test_package_version_matches_distribution_metadata() -> None:

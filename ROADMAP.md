@@ -33,10 +33,16 @@ backend. PDFium renders only pages selected by the immutable Milestone 2A routin
 text, character-error-rate, and word-error-rate evaluation is available without hidden
 normalization. This implementation remains subject to milestone review and acceptance.
 
-## Milestone 3 — Structured Document Representation
+## Milestone 3 — Structured Document Representation (implementation pending acceptance)
 
 Represent pages, text spans, layout elements, tables, and their source coordinates without losing
 the provenance needed for later evidence display.
+
+The current implementation emits explicit top-left PDF-point or image-pixel coordinates for
+embedded words and replay-verified OCR lines, plus line-delimited PDF table grids and positioned
+cells. Immutable schema-v1 artifacts retain exact document, text-routing, OCR, processor, backend,
+configuration, and content provenance. This implementation remains subject to milestone review
+and acceptance.
 
 ## Milestone 4 — Provenance-aware Chunking & Corpus Model
 

@@ -9,6 +9,15 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 
 ### Added
 
+- Milestone 3 immutable schema-v1 structured-document artifacts with positioned embedded PDF words,
+  replay-verified OCR lines, explicit top-left PDF-point/image-pixel coordinates, and exact
+  document/text/OCR provenance.
+- Deterministic pdfplumber line-based PDF table detection with positioned cells, stable ordering,
+  typed span/table/cell limits, canonical JSON, content checksums, atomic storage, and strict
+  provenance-verified readback.
+- Structured-document Python APIs plus `pagetrace structure` and `pagetrace inspect-structure`
+  commands, optional `structure` dependencies, real vector-table integration coverage, and
+  clean-wheel CLI smoke checks.
 - Routed Milestone 2B OCR for verified `OCR_CANDIDATE` and policy-eligible sparse pages using
   RapidOCR with bundled PP-OCR models, CPU ONNX Runtime, and PDFium rendering for selected PDF pages.
 - Immutable schema-v1 OCR artifacts with document/text-routing provenance, engine/backend/renderer

@@ -1,4 +1,4 @@
-"""Command-line interface for ingestion and deterministic text extraction."""
+"""Command-line interface for deterministic PageTrace document processing."""
 
 from __future__ import annotations
 
@@ -34,6 +34,13 @@ from pagetrace.ocr import (
     ocr_document,
     serialize_ocr_artifact,
     serialize_ocr_evaluation,
+)
+from pagetrace.structure import (
+    StructuredDocumentArtifact,
+    StructureError,
+    load_structured_document,
+    serialize_structured_document,
+    structure_document,
 )
 
 _MAX_EVALUATION_TEXT_BYTES = 20 * 1024 * 1024
@@ -105,6 +112,33 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate_parser.add_argument("reference", type=Path, help="reference UTF-8 text file")
     evaluate_parser.add_argument("prediction", type=Path, help="predicted UTF-8 text file")
     evaluate_parser.add_argument("--json", action="store_true", help="emit stable metric JSON")
+
+    structure_parser = subparsers.add_parser(
+        "structure", help="build positioned words, OCR lines, tables, and cells"
+    )
+    structure_parser.add_argument("document_id", help="verified PageTrace document identifier")
+    structure_parser.add_argument(
+        "text_artifact_id", help="verified text-routing artifact identifier"
+    )
+    structure_parser.add_argument("ocr_artifact_id", help="verified routed-OCR artifact identifier")
+    structure_parser.add_argument("--store", type=Path, default=Path(".pagetrace"))
+    structure_parser.add_argument(
+        "--json", action="store_true", help="emit the canonical structured artifact"
+    )
+
+    inspect_structure_parser = subparsers.add_parser(
+        "inspect-structure", help="verify and inspect a stored structured artifact"
+    )
+    inspect_structure_parser.add_argument(
+        "document_id", help="verified PageTrace document identifier"
+    )
+    inspect_structure_parser.add_argument(
+        "artifact_id", help="canonical structured artifact identifier"
+    )
+    inspect_structure_parser.add_argument("--store", type=Path, default=Path(".pagetrace"))
+    inspect_structure_parser.add_argument(
+        "--json", action="store_true", help="emit the canonical structured artifact"
+    )
     return parser
 
 
@@ -149,13 +183,28 @@ def main(argv: Sequence[str] | None = None) -> int:
                 store=arguments.store,
             )
             _print_ocr_artifact(ocr_artifact, as_json=arguments.json)
-        else:
+        elif arguments.command == "evaluate-ocr":
             evaluation = evaluate_ocr(
                 _read_evaluation_text(arguments.reference),
                 _read_evaluation_text(arguments.prediction),
             )
             _print_ocr_evaluation(evaluation, as_json=arguments.json)
-    except (DocumentError, ExtractionError, OcrError) as exc:
+        elif arguments.command == "structure":
+            structured_artifact = structure_document(
+                arguments.document_id,
+                arguments.text_artifact_id,
+                arguments.ocr_artifact_id,
+                store=arguments.store,
+            )
+            _print_structured_document(structured_artifact, as_json=arguments.json)
+        else:
+            structured_artifact = load_structured_document(
+                arguments.artifact_id,
+                document_id=arguments.document_id,
+                store=arguments.store,
+            )
+            _print_structured_document(structured_artifact, as_json=arguments.json)
+    except (DocumentError, ExtractionError, OcrError, StructureError) as exc:
         print(f"pagetrace: error: {exc}", file=sys.stderr)
         return 2
     return 0
@@ -224,6 +273,26 @@ def _print_ocr_evaluation(evaluation: OcrEvaluation, *, as_json: bool) -> None:
         f"word error rate: {evaluation.word_error_rate:.6f} "
         f"({evaluation.word_edits}/{evaluation.reference_word_count})"
     )
+
+
+def _print_structured_document(artifact: StructuredDocumentArtifact, *, as_json: bool) -> None:
+    if as_json:
+        sys.stdout.buffer.write(serialize_structured_document(artifact))
+        return
+    print(f"structured artifact id: {artifact.artifact_id}")
+    print(f"document id: {artifact.document_id}")
+    print(f"source text artifact id: {artifact.source_text_artifact_id}")
+    print(f"source OCR artifact id: {artifact.source_ocr_artifact_id}")
+    print(f"pages: {artifact.page_count}")
+    print(f"positioned text spans: {artifact.span_count}")
+    print(f"tables: {artifact.table_count}")
+    print(f"table cells: {artifact.cell_count}")
+    for page in artifact.pages:
+        print(
+            f"page {page.page_number}: {len(page.spans)} spans, "
+            f"{len(page.tables)} tables ({page.width:g} x {page.height:g} "
+            f"{page.dimension_unit.value})"
+        )
 
 
 def _read_evaluation_text(path: Path) -> str:

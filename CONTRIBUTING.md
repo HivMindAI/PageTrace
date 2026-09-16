@@ -17,7 +17,7 @@ python -m venv .venv
 # Linux/macOS: source .venv/bin/activate
 # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -e ".[dev,ocr]"
+python -m pip install -e ".[dev,ocr,structure]"
 ```
 
 The editable installation is required so tests import the installed `src/` package rather than
@@ -57,9 +57,12 @@ pagetrace extract-text --help
 pagetrace ocr --help
 pagetrace inspect-ocr --help
 pagetrace evaluate-ocr --help
+pagetrace structure --help
+pagetrace inspect-structure --help
 python -I -m pagetrace --help
 python -I -m pagetrace extract-text --help
 python -I -m pagetrace ocr --help
+python -I -m pagetrace structure --help
 ```
 
 The smoke test must use the wheel's interpreter and must not rely on an editable installation,
@@ -119,6 +122,23 @@ page, pixel, line, and character limits without truncation or partial artifact p
 inference, renderer, model-byte, source-routing, configuration, and document provenance must remain
 part of the immutable artifact contract. Accuracy tests must use declared reference text and report
 transparent exact/CER/WER measurements without claiming general language or document quality.
+
+## Structured-representation changes
+
+Structure construction must begin from one verified document, its exact Milestone 2A text artifact,
+and a Milestone 2B OCR artifact derived from that text artifact. Keep pdfplumber behind the optional
+`structure` extra and retain lazy imports so the base wheel and CLI help work without it. OCR
+geometry replay must use the exact recorded OCR processor and configuration; do not accept geometry
+when replayed text, line count, or mean confidence changes.
+
+All page, word, OCR-line, table, and cell coordinates use an explicit top-left origin. PDF units are
+points and image units are pixels. Validate finite positive-area boxes against page/table bounds,
+retain exact prior-stage provenance, enforce typed span/table/cell limits without truncation, and
+never persist a partial artifact. Real generated vector-table PDFs should exercise the pdfplumber
+boundary; narrow mocks remain appropriate for malformed-output and limit failures.
+
+pdfplumber is an MIT-licensed optional dependency. Changes to its version range or replacement
+still require capability, security, compatibility, and license review.
 
 ## Git hygiene
 

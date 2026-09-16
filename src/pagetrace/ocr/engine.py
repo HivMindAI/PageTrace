@@ -6,9 +6,11 @@ import hashlib
 import importlib
 import importlib.util
 import math
+from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
 from io import BytesIO
+from numbers import Real
 from pathlib import Path
 from typing import Protocol
 
@@ -35,13 +37,17 @@ _MODEL_FILES = (
 )
 _BACKEND_FAILURES = (ImportError, OSError, RuntimeError, TypeError, ValueError)
 
+OcrPoint = tuple[float, float]
+OcrQuadrilateral = tuple[OcrPoint, OcrPoint, OcrPoint, OcrPoint]
+
 
 @dataclass(frozen=True, slots=True)
 class OcrEngineResult:
-    """Validated line text and confidence values returned by an OCR backend."""
+    """Validated line text, confidence, and rendered-pixel geometry from OCR."""
 
     lines: tuple[str, ...]
     confidences: tuple[float, ...]
+    boxes: tuple[OcrQuadrilateral, ...] = ()
 
 
 class OcrEngine(Protocol):
@@ -99,21 +105,24 @@ class RapidOcrEngine:
 
         raw_lines = getattr(output, "txts", None)
         raw_confidences = getattr(output, "scores", None)
-        if raw_lines is None and raw_confidences is None:
+        raw_boxes = getattr(output, "boxes", None)
+        if raw_lines is None and raw_confidences is None and raw_boxes is None:
             return OcrEngineResult(lines=(), confidences=())
-        if raw_lines is None or raw_confidences is None:
-            raise OcrProcessingError("RapidOCR returned incomplete line/confidence output")
+        if raw_lines is None or raw_confidences is None or raw_boxes is None:
+            raise OcrProcessingError("RapidOCR returned incomplete text/confidence/geometry output")
         try:
             lines = tuple(raw_lines)
             confidences = tuple(raw_confidences)
+            boxes = tuple(raw_boxes)
         except TypeError as exc:
             raise OcrProcessingError("RapidOCR returned non-iterable output") from exc
-        if len(lines) != len(confidences):
-            raise OcrProcessingError("RapidOCR returned mismatched line/confidence output")
+        if len(lines) != len(confidences) or len(lines) != len(boxes):
+            raise OcrProcessingError("RapidOCR returned mismatched text/confidence/geometry output")
 
         accepted_lines: list[str] = []
         accepted_confidences: list[float] = []
-        for line, confidence in zip(lines, confidences, strict=True):
+        accepted_boxes: list[OcrQuadrilateral] = []
+        for line, confidence, box in zip(lines, confidences, boxes, strict=True):
             if not isinstance(line, str) or not line.strip():
                 raise OcrProcessingError("RapidOCR returned an invalid text line")
             if (
@@ -125,7 +134,12 @@ class RapidOcrEngine:
                 raise OcrProcessingError("RapidOCR returned an invalid confidence value")
             accepted_lines.append(line)
             accepted_confidences.append(round(float(confidence), 6))
-        return OcrEngineResult(lines=tuple(accepted_lines), confidences=tuple(accepted_confidences))
+            accepted_boxes.append(_validated_box(box, image.width, image.height))
+        return OcrEngineResult(
+            lines=tuple(accepted_lines),
+            confidences=tuple(accepted_confidences),
+            boxes=tuple(accepted_boxes),
+        )
 
 
 def create_ocr_engine(configuration: OcrConfig) -> OcrEngine:
@@ -187,3 +201,37 @@ def _model_fingerprint(model_paths: dict[str, Path]) -> str:
     except OSError as exc:
         raise OcrDependencyError("bundled RapidOCR models could not be fingerprinted") from exc
     return digest.hexdigest()
+
+
+def _validated_box(value: object, width: int, height: int) -> OcrQuadrilateral:
+    if not isinstance(value, Iterable):
+        raise OcrProcessingError("RapidOCR returned a non-iterable text box")
+    points: tuple[object, ...] = tuple(value)
+    if len(points) != 4:
+        raise OcrProcessingError("RapidOCR text boxes must contain four points")
+
+    accepted: list[OcrPoint] = []
+    for point in points:
+        if not isinstance(point, Iterable):
+            raise OcrProcessingError("RapidOCR returned a non-iterable text-box point")
+        coordinates: tuple[object, ...] = tuple(point)
+        if len(coordinates) != 2:
+            raise OcrProcessingError("RapidOCR text-box points must contain two coordinates")
+        x = _validated_coordinate(coordinates[0], width, "x")
+        y = _validated_coordinate(coordinates[1], height, "y")
+        accepted.append((x, y))
+
+    xs = tuple(point[0] for point in accepted)
+    ys = tuple(point[1] for point in accepted)
+    if min(xs) >= max(xs) or min(ys) >= max(ys):
+        raise OcrProcessingError("RapidOCR returned a degenerate text box")
+    return accepted[0], accepted[1], accepted[2], accepted[3]
+
+
+def _validated_coordinate(value: object, maximum: int, axis: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, Real) or not math.isfinite(value):
+        raise OcrProcessingError(f"RapidOCR returned an invalid {axis} coordinate")
+    coordinate = round(float(value), 6)
+    if not 0 <= coordinate <= maximum:
+        raise OcrProcessingError(f"RapidOCR returned an out-of-bounds {axis} coordinate")
+    return 0.0 if coordinate == 0 else coordinate
