@@ -8,6 +8,13 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from pagetrace.corpus import (
+    CorpusArtifact,
+    CorpusError,
+    build_corpus,
+    load_corpus_artifact,
+    serialize_corpus_artifact,
+)
 from pagetrace.documents import (
     DocumentError,
     DocumentManifest,
@@ -139,6 +146,28 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_structure_parser.add_argument(
         "--json", action="store_true", help="emit the canonical structured artifact"
     )
+
+    corpus_parser = subparsers.add_parser(
+        "build-corpus", help="build deterministic page-bounded chunks with exact provenance"
+    )
+    corpus_parser.add_argument("document_id", help="verified PageTrace document identifier")
+    corpus_parser.add_argument(
+        "structure_artifact_id", help="verified structured artifact identifier"
+    )
+    corpus_parser.add_argument("--store", type=Path, default=Path(".pagetrace"))
+    corpus_parser.add_argument(
+        "--json", action="store_true", help="emit the canonical corpus artifact"
+    )
+
+    inspect_corpus_parser = subparsers.add_parser(
+        "inspect-corpus", help="verify and inspect a stored corpus artifact"
+    )
+    inspect_corpus_parser.add_argument("document_id", help="verified PageTrace document identifier")
+    inspect_corpus_parser.add_argument("artifact_id", help="canonical corpus artifact identifier")
+    inspect_corpus_parser.add_argument("--store", type=Path, default=Path(".pagetrace"))
+    inspect_corpus_parser.add_argument(
+        "--json", action="store_true", help="emit the canonical corpus artifact"
+    )
     return parser
 
 
@@ -197,14 +226,28 @@ def main(argv: Sequence[str] | None = None) -> int:
                 store=arguments.store,
             )
             _print_structured_document(structured_artifact, as_json=arguments.json)
-        else:
+        elif arguments.command == "inspect-structure":
             structured_artifact = load_structured_document(
                 arguments.artifact_id,
                 document_id=arguments.document_id,
                 store=arguments.store,
             )
             _print_structured_document(structured_artifact, as_json=arguments.json)
-    except (DocumentError, ExtractionError, OcrError, StructureError) as exc:
+        elif arguments.command == "build-corpus":
+            corpus_artifact = build_corpus(
+                arguments.document_id,
+                arguments.structure_artifact_id,
+                store=arguments.store,
+            )
+            _print_corpus_artifact(corpus_artifact, as_json=arguments.json)
+        else:
+            corpus_artifact = load_corpus_artifact(
+                arguments.artifact_id,
+                document_id=arguments.document_id,
+                store=arguments.store,
+            )
+            _print_corpus_artifact(corpus_artifact, as_json=arguments.json)
+    except (DocumentError, ExtractionError, OcrError, StructureError, CorpusError) as exc:
         print(f"pagetrace: error: {exc}", file=sys.stderr)
         return 2
     return 0
@@ -292,6 +335,26 @@ def _print_structured_document(artifact: StructuredDocumentArtifact, *, as_json:
             f"page {page.page_number}: {len(page.spans)} spans, "
             f"{len(page.tables)} tables ({page.width:g} x {page.height:g} "
             f"{page.dimension_unit.value})"
+        )
+
+
+def _print_corpus_artifact(artifact: CorpusArtifact, *, as_json: bool) -> None:
+    if as_json:
+        sys.stdout.buffer.write(serialize_corpus_artifact(artifact))
+        return
+    print(f"corpus artifact id: {artifact.artifact_id}")
+    print(f"document id: {artifact.document_id}")
+    print(f"source structure artifact id: {artifact.source_structure_artifact_id}")
+    print(f"processor: {artifact.processor.name} {artifact.processor.version}")
+    print(f"pages: {artifact.page_count}")
+    print(f"source text spans: {artifact.source_span_count}")
+    print(f"source tables: {artifact.source_table_count}")
+    print(f"chunks: {artifact.chunk_count}")
+    print(f"chunk characters: {artifact.character_count}")
+    for chunk in artifact.chunks:
+        print(
+            f"chunk {chunk.chunk_index}: page {chunk.page_number}, "
+            f"{chunk.character_count} characters, {len(chunk.fragments)} fragments"
         )
 
 

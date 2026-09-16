@@ -44,10 +44,17 @@ cells. Immutable schema-v1 artifacts retain exact document, text-routing, OCR, p
 configuration, and content provenance. This implementation remains subject to milestone review
 and acceptance.
 
-## Milestone 4 — Provenance-aware Chunking & Corpus Model
+## Milestone 4 — Provenance-aware Chunking & Corpus Model (implementation pending acceptance)
 
 Create chunks and corpus records that retain document, page, region, transformation, and version
 lineage while supporting repeatable reconstruction.
+
+The current implementation builds deterministic page-bounded chunks from positioned text spans,
+splits oversized spans into exact character slices, and records source/chunk offsets and bounding
+regions for every fragment. Immutable schema-v1 corpus artifacts retain exact structure identity,
+content fingerprint, processor, configuration, limits, canonical checksums, and atomic storage.
+Readback regenerates the complete corpus from the verified structure source. This implementation
+remains subject to milestone review and acceptance.
 
 ## Milestone 5 — Retrieval Baselines & Evaluation
 

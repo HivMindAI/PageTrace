@@ -9,6 +9,12 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 
 ### Added
 
+- Milestone 4 immutable schema-v1 corpus artifacts with deterministic page-bounded chunks, stable
+  chunk identities, exact source-span/chunk character offsets, positioned evidence regions, and
+  complete structured-artifact lineage.
+- Deterministic oversized-span splitting, explicit separator policy, typed chunk/fragment/character
+  limits, canonical JSON and checksums, atomic persistence, source reconstruction on readback, Python
+  APIs, `build-corpus`/`inspect-corpus` CLI commands, and clean-wheel smoke coverage.
 - Milestone 3 immutable schema-v1 structured-document artifacts with positioned embedded PDF words,
   replay-verified OCR lines, explicit top-left PDF-point/image-pixel coordinates, and exact
   document/text/OCR provenance.

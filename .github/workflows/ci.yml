@@ -76,7 +76,7 @@ jobs:
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -m pip install dist/*.whl
           cd "${RUNNER_TEMP}"
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -c \
-            "import pagetrace, pagetrace.extraction, pagetrace.ocr; print(pagetrace.__name__, pagetrace.__file__)"
+            "import pagetrace, pagetrace.corpus, pagetrace.extraction, pagetrace.ocr; print(pagetrace.__name__, pagetrace.__file__)"
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" extract-text --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" ocr --help
@@ -84,7 +84,10 @@ jobs:
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" evaluate-ocr --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" structure --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" inspect-structure --help
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" build-corpus --help
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" inspect-corpus --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace extract-text --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace ocr --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace structure --help
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace build-corpus --help

@@ -7,11 +7,13 @@ import pytest
 
 import pagetrace.cli
 from pagetrace.cli import build_parser, main
+from pagetrace.corpus import CorpusLimitError, build_corpus_artifact
 from pagetrace.documents import ingest_document
 from pagetrace.extraction import ExtractionLimitError, extract_document_text
 from pagetrace.ocr import OcrEvaluationError
 from pagetrace.structure import StructureProcessingError
 from tests.conftest import ImageFactory
+from tests.test_corpus_models import _source as corpus_source
 from tests.test_structure_models import _artifact as structured_artifact
 
 
@@ -325,3 +327,70 @@ def test_cli_structure_failure_is_concise(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == "pagetrace: error: structure failed safely\n"
+
+
+def test_cli_build_and_inspect_corpus_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    artifact = build_corpus_artifact(corpus_source((("PageTrace", "corpus"),)))
+    monkeypatch.setattr(pagetrace.cli, "build_corpus", lambda *_args, **_kwargs: artifact)
+
+    assert (
+        main(
+            [
+                "build-corpus",
+                artifact.document_id,
+                artifact.source_structure_artifact_id,
+                "--store",
+                str(tmp_path),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert f"corpus artifact id: {artifact.artifact_id}" in output
+    assert "source text spans: 2" in output
+    assert "chunks: 1" in output
+
+    monkeypatch.setattr(pagetrace.cli, "load_corpus_artifact", lambda *_args, **_kwargs: artifact)
+    assert (
+        main(
+            [
+                "inspect-corpus",
+                artifact.document_id,
+                artifact.artifact_id,
+                "--store",
+                str(tmp_path),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["artifact_id"] == artifact.artifact_id
+    assert payload["chunks"][0]["fragments"][0]["span_id"]
+
+
+def test_cli_corpus_failure_is_concise(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise CorpusLimitError("corpus limit reached")
+
+    monkeypatch.setattr(pagetrace.cli, "build_corpus", fail)
+    assert (
+        main(
+            [
+                "build-corpus",
+                f"sha256-{'1' * 64}",
+                f"structure-sha256-{'2' * 64}",
+            ]
+        )
+        == 2
+    )
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == "pagetrace: error: corpus limit reached\n"

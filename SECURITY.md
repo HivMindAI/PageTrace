@@ -4,8 +4,9 @@ PageTrace is designed for documents that may be malformed, adversarial, sensitiv
 unexpected. Milestone 1 implements the accepted bounded local ingestion boundary for PDF, PNG, and
 JPEG. Milestone 2A adds in-process embedded PDF text extraction and explicit OCR-candidate routing.
 Milestone 2B adds bounded, routed PDFium rendering and RapidOCR inference. Milestone 3 adds
-pdfplumber layout/table parsing and deterministic OCR geometry replay. None of these stages provides
-complete document sandboxing.
+pdfplumber layout/table parsing and deterministic OCR geometry replay. Milestone 4 adds bounded
+deterministic chunk construction and full structure-to-corpus reconstruction checks without
+introducing another parser or model. None of these stages provides complete document sandboxing.
 
 ## Implemented Milestone 1 protections
 
@@ -99,6 +100,25 @@ document text to a shell, browser, model, service, or other execution environmen
 Line-based table detection and OCR geometry remain untrusted derived data. Coordinates establish
 traceable regions, not semantic correctness or reading-order accuracy.
 
+## Implemented Milestone 4 protections
+
+- Corpus construction accepts only an existing structured artifact whose complete earlier-stage
+  provenance is successfully reverified.
+- Chunks never cross page boundaries. Every fragment records exact source-span and chunk character
+  offsets, bounding region, coordinate unit/origin, evidence source, and stable ordering.
+- Oversized spans are split deterministically into gap-free slices; text is never silently dropped
+  or truncated. Empty structured pages produce no fabricated chunk.
+- Typed limits cap chunks per page/document, fragments per chunk/document, and cumulative chunk
+  characters. Violations fail before persistence without a partial artifact.
+- Schema-v1 corpus artifacts record the source structure identity/content fingerprint, processor
+  version, output-affecting configuration, limits, per-chunk checksums, and a corpus checksum.
+- Atomic no-overwrite persistence uses system-derived paths. Every readback reloads the structured
+  source and regenerates the expected artifact, rejecting any lineage, text, offset, region, order,
+  identity, or configuration contradiction.
+
+Chunking does not make source text trustworthy or semantically correct. Tables remain available
+through the linked structured artifact and are not duplicated into speculative table text.
+
 ## Security principles
 
 - Treat every document and all extracted content as untrusted data.
@@ -111,7 +131,7 @@ traceable regions, not semantic correctness or reading-order accuracy.
 
 ## Residual risks and future security work
 
-Milestones 1 through 3 are in-process parser/inference boundaries, not operating-system sandboxes.
+Milestones 1 through 4 are in-process processing boundaries, not operating-system sandboxes.
 Residual risks include vulnerabilities or pathological CPU/memory behavior in pypdf and
 pdfplumber text/content-stream/layout parsing, Pillow, Python, or native image codecs; very large
 decompressed text streams; deeply nested PDF object graphs; filesystem exhaustion; storage-root
@@ -124,7 +144,8 @@ that check. OCR pixel preflight does not prevent malicious PDFium, image-codec, 
 or ONNX Runtime inputs from consuming CPU or memory before returning. OCR line and character limits
 apply after inference. Structure span/table/cell limits apply after parser or inference work has
 returned data. PageTrace does not claim CPU, memory, time, subprocess, parser, or inference
-isolation.
+isolation. Corpus limits bound accepted output but construction and canonical serialization may
+still consume memory proportional to the verified structured input.
 
 Future threat modeling and milestones will cover at least:
 
