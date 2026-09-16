@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import stat
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -21,6 +22,21 @@ from pagetrace.extraction import (
     load_text_extraction,
     serialize_text_extraction,
 )
+from pagetrace.ocr import (
+    OcrArtifact,
+    OcrConfig,
+    OcrError,
+    OcrEvaluation,
+    OcrEvaluationError,
+    OcrRoutingPolicy,
+    evaluate_ocr,
+    load_ocr_artifact,
+    ocr_document,
+    serialize_ocr_artifact,
+    serialize_ocr_evaluation,
+)
+
+_MAX_EVALUATION_TEXT_BYTES = 20 * 1024 * 1024
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -59,6 +75,36 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_text_parser.add_argument(
         "--json", action="store_true", help="emit the canonical text artifact"
     )
+
+    ocr_parser = subparsers.add_parser(
+        "ocr", help="run OCR only on pages selected by a text-routing artifact"
+    )
+    ocr_parser.add_argument("document_id", help="verified PageTrace document identifier")
+    ocr_parser.add_argument("text_artifact_id", help="verified text-routing artifact identifier")
+    ocr_parser.add_argument("--store", type=Path, default=Path(".pagetrace"))
+    ocr_parser.add_argument(
+        "--candidates-only",
+        action="store_true",
+        help="exclude sparse embedded-text pages from OCR",
+    )
+    ocr_parser.add_argument("--json", action="store_true", help="emit the canonical OCR artifact")
+
+    inspect_ocr_parser = subparsers.add_parser(
+        "inspect-ocr", help="verify and inspect a stored OCR artifact"
+    )
+    inspect_ocr_parser.add_argument("document_id", help="verified PageTrace document identifier")
+    inspect_ocr_parser.add_argument("artifact_id", help="canonical OCR artifact identifier")
+    inspect_ocr_parser.add_argument("--store", type=Path, default=Path(".pagetrace"))
+    inspect_ocr_parser.add_argument(
+        "--json", action="store_true", help="emit the canonical OCR artifact"
+    )
+
+    evaluate_parser = subparsers.add_parser(
+        "evaluate-ocr", help="measure exact OCR text against a UTF-8 reference"
+    )
+    evaluate_parser.add_argument("reference", type=Path, help="reference UTF-8 text file")
+    evaluate_parser.add_argument("prediction", type=Path, help="predicted UTF-8 text file")
+    evaluate_parser.add_argument("--json", action="store_true", help="emit stable metric JSON")
     return parser
 
 
@@ -76,14 +122,40 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif arguments.command == "extract-text":
             artifact = extract_document_text(arguments.document_id, store=arguments.store)
             _print_text_extraction(artifact, as_json=arguments.json)
-        else:
+        elif arguments.command == "inspect-text":
             artifact = load_text_extraction(
                 arguments.artifact_id,
                 document_id=arguments.document_id,
                 store=arguments.store,
             )
             _print_text_extraction(artifact, as_json=arguments.json)
-    except (DocumentError, ExtractionError) as exc:
+        elif arguments.command == "ocr":
+            routing_policy = (
+                OcrRoutingPolicy.CANDIDATES_ONLY
+                if arguments.candidates_only
+                else OcrRoutingPolicy.CANDIDATES_AND_SPARSE
+            )
+            ocr_artifact = ocr_document(
+                arguments.document_id,
+                arguments.text_artifact_id,
+                store=arguments.store,
+                configuration=OcrConfig(routing_policy=routing_policy),
+            )
+            _print_ocr_artifact(ocr_artifact, as_json=arguments.json)
+        elif arguments.command == "inspect-ocr":
+            ocr_artifact = load_ocr_artifact(
+                arguments.artifact_id,
+                document_id=arguments.document_id,
+                store=arguments.store,
+            )
+            _print_ocr_artifact(ocr_artifact, as_json=arguments.json)
+        else:
+            evaluation = evaluate_ocr(
+                _read_evaluation_text(arguments.reference),
+                _read_evaluation_text(arguments.prediction),
+            )
+            _print_ocr_evaluation(evaluation, as_json=arguments.json)
+    except (DocumentError, ExtractionError, OcrError) as exc:
         print(f"pagetrace: error: {exc}", file=sys.stderr)
         return 2
     return 0
@@ -117,3 +189,60 @@ def _print_text_extraction(artifact: TextExtractionArtifact, *, as_json: bool) -
             f"page {page.page_number}: {page.status.value} "
             f"({page.non_whitespace_character_count} non-whitespace characters)"
         )
+
+
+def _print_ocr_artifact(artifact: OcrArtifact, *, as_json: bool) -> None:
+    if as_json:
+        sys.stdout.buffer.write(serialize_ocr_artifact(artifact))
+        return
+    print(f"OCR artifact id: {artifact.artifact_id}")
+    print(f"document id: {artifact.document_id}")
+    print(f"source text artifact id: {artifact.source_text_artifact_id}")
+    print(f"OCR engine: {artifact.processor.engine_name} {artifact.processor.engine_version}")
+    print(
+        f"inference backend: {artifact.processor.inference_backend_name} "
+        f"{artifact.processor.inference_backend_version}"
+    )
+    print(f"selected pages: {artifact.selected_page_count}/{artifact.page_count}")
+    for page in artifact.pages:
+        print(
+            f"page {page.page_number}: {page.status.value} "
+            f"({page.non_whitespace_character_count} non-whitespace characters)"
+        )
+
+
+def _print_ocr_evaluation(evaluation: OcrEvaluation, *, as_json: bool) -> None:
+    if as_json:
+        sys.stdout.buffer.write(serialize_ocr_evaluation(evaluation))
+        return
+    print(f"exact match: {'yes' if evaluation.exact_match else 'no'}")
+    print(
+        f"character error rate: {evaluation.character_error_rate:.6f} "
+        f"({evaluation.character_edits}/{evaluation.reference_character_count})"
+    )
+    print(
+        f"word error rate: {evaluation.word_error_rate:.6f} "
+        f"({evaluation.word_edits}/{evaluation.reference_word_count})"
+    )
+
+
+def _read_evaluation_text(path: Path) -> str:
+    try:
+        metadata = path.lstat()
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+            raise OcrEvaluationError("OCR evaluation input must be a regular non-symlink file")
+        if metadata.st_size > _MAX_EVALUATION_TEXT_BYTES:
+            raise OcrEvaluationError(
+                f"OCR evaluation input exceeds {_MAX_EVALUATION_TEXT_BYTES} bytes"
+            )
+        data = path.read_bytes()
+    except OcrEvaluationError:
+        raise
+    except OSError as exc:
+        raise OcrEvaluationError("OCR evaluation input could not be read") from exc
+    if len(data) != metadata.st_size:
+        raise OcrEvaluationError("OCR evaluation input changed while it was read")
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise OcrEvaluationError("OCR evaluation input must be valid UTF-8") from exc

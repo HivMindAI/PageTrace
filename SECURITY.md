@@ -2,8 +2,9 @@
 
 PageTrace is designed for documents that may be malformed, adversarial, sensitive, or simply
 unexpected. Milestone 1 implements the accepted bounded local ingestion boundary for PDF, PNG, and
-JPEG. Milestone 2A adds in-process embedded PDF text extraction and explicit OCR-candidate routing
-on `feat/milestone-2a-text-extraction`. Neither stage provides complete document sandboxing.
+JPEG. Milestone 2A adds in-process embedded PDF text extraction and explicit OCR-candidate routing.
+Milestone 2B adds bounded, routed PDFium rendering and RapidOCR inference. None of these stages
+provides complete document sandboxing.
 
 ## Implemented Milestone 1 protections
 
@@ -62,6 +63,24 @@ Text extracted from a document remains untrusted data. PageTrace does not execut
 commands, URLs, scripts, model instructions, or prompt-injection text. Milestone 2A does not pass
 document text to a shell, browser, model, service, or other execution environment.
 
+## Implemented Milestone 2B protections
+
+- OCR requires an existing verified text-routing artifact and selects only `OCR_CANDIDATE` pages
+  plus policy-eligible `SPARSE_EMBEDDED_TEXT` pages. Embedded-text pages are not rendered.
+- PDF pages are preflighted at a fixed captured DPI against per-page and cumulative pixel limits;
+  actual rendered dimensions are checked again. Verified images use their original bounded pixels.
+- OCR defaults cap selected pages, rendered pixels, detected lines, and accepted characters.
+  Violations raise before persistence and never truncate output or produce a partial artifact.
+- RapidOCR uses CPU ONNX Runtime with single-thread inference settings and fixed bundled PP-OCR
+  model paths. PageTrace does not invoke RapidOCR's model downloader.
+- OCR provenance records processor, engine, inference backend, optional PDF renderer, fixed model
+  profile, the combined SHA-256 of model bytes, routing policy, confidence threshold, rendering
+  settings, limits, and the exact source text artifact.
+- Canonical schema-v1 OCR artifacts use separate system-derived paths, atomic no-overwrite
+  promotion, page-content checksums, strict readback, and document/text-artifact re-verification.
+- Evaluation compares caller-provided UTF-8 strings exactly and reports exact match, character
+  error rate, and word error rate without hidden normalization or an accuracy claim.
+
 ## Security principles
 
 - Treat every document and all extracted content as untrusted data.
@@ -74,7 +93,7 @@ document text to a shell, browser, model, service, or other execution environmen
 
 ## Residual risks and future security work
 
-Milestones 1 and 2A are in-process parser boundaries, not operating-system sandboxes. Residual risks
+Milestones 1, 2A, and 2B are in-process parser/inference boundaries, not operating-system sandboxes. Residual risks
 include vulnerabilities or pathological CPU/memory behavior in pypdf text/content-stream parsing,
 Pillow, Python, or native image codecs; very large decompressed text streams; deeply nested PDF
 object graphs; filesystem exhaustion; storage-root tampering by a separate privileged process; and
@@ -82,7 +101,10 @@ source/storage mutation races. Existing byte/page/pixel bounds and repeated fing
 reduce exposure but cannot solve every denial-of-service or local-adversary scenario. Extraction
 character limits bound accepted page output and cumulative canonical artifact size only after
 `extract_text` returns. Malicious compressed/content streams may consume pypdf CPU or RAM before
-that check. Milestone 2A does not claim CPU, memory, time, subprocess, or parser isolation.
+that check. OCR pixel preflight does not prevent malicious PDFium, image-codec, RapidOCR, OpenCV,
+or ONNX Runtime inputs from consuming CPU or memory before returning. OCR line and character limits
+apply after inference. PageTrace does not claim CPU, memory, time, subprocess, parser, or inference
+isolation.
 
 Future threat modeling and milestones will cover at least:
 
@@ -94,8 +116,9 @@ Future threat modeling and milestones will cover at least:
 - confidential, regulated, or personally identifiable content; and
 - unintended exposure to future external model or service providers.
 
-Prompt injection is already a data-handling concern because Milestone 2A extracts untrusted text,
-but no model or external service consumes that text yet. Model-provider disclosure, process
+Prompt injection is already a data-handling concern because PageTrace extracts untrusted text.
+RapidOCR is a local purpose-built OCR model and its output remains untrusted data; no LLM, VLM, or
+external model service consumes document content. Model-provider disclosure, process
 isolation, broader quotas, privacy controls, supply-chain hardening, and operational incident
 controls remain later roadmap responsibilities.
 

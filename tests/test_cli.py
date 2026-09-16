@@ -8,7 +8,8 @@ import pytest
 import pagetrace.cli
 from pagetrace.cli import build_parser, main
 from pagetrace.documents import ingest_document
-from pagetrace.extraction import ExtractionLimitError
+from pagetrace.extraction import ExtractionLimitError, extract_document_text
+from pagetrace.ocr import OcrEvaluationError
 from tests.conftest import ImageFactory
 
 
@@ -151,3 +152,96 @@ def test_cli_extraction_limit_failure_is_concise(
     assert captured.out == ""
     assert captured.err == ("pagetrace: error: test output exceeds configured extraction limit\n")
     assert "Traceback" not in captured.err
+
+
+def test_cli_ocr_and_inspection_plain_output(
+    tmp_path: Path,
+    image_factory: ImageFactory,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    store = tmp_path / "store"
+    source = image_factory(tmp_path / "image.png", image_format="PNG", size=(40, 30))
+    manifest = ingest_document(source, store=store)
+    text_artifact = extract_document_text(manifest.document_id, store=store)
+
+    assert (
+        main(
+            [
+                "ocr",
+                manifest.document_id,
+                text_artifact.artifact_id,
+                "--candidates-only",
+                "--store",
+                str(store),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    artifact_id = output.splitlines()[0].split(": ", 1)[1]
+    assert "OCR engine: rapidocr" in output
+    assert "selected pages: 1/1" in output
+
+    assert (
+        main(
+            [
+                "inspect-ocr",
+                manifest.document_id,
+                artifact_id,
+                "--store",
+                str(store),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["artifact_id"] == artifact_id
+    assert payload["configuration"]["routing_policy"] == "ocr_candidates_only"
+
+
+def test_cli_evaluates_utf8_text_in_plain_and_json_forms(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    reference = tmp_path / "reference.txt"
+    prediction = tmp_path / "prediction.txt"
+    reference.write_text("one two", encoding="utf-8")
+    prediction.write_text("one too", encoding="utf-8")
+
+    assert main(["evaluate-ocr", str(reference), str(prediction)]) == 0
+    output = capsys.readouterr().out
+    assert "exact match: no" in output
+    assert "character error rate:" in output
+    assert "word error rate:" in output
+
+    assert main(["evaluate-ocr", str(reference), str(reference), "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["exact_match"] is True
+
+
+@pytest.mark.parametrize(
+    ("name", "data", "message"),
+    [
+        ("invalid.txt", b"\xff", "valid UTF-8"),
+        ("missing.txt", None, "could not be read"),
+    ],
+)
+def test_cli_evaluation_input_failures_are_concise(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    name: str,
+    data: bytes | None,
+    message: str,
+) -> None:
+    reference = tmp_path / "reference.txt"
+    reference.write_text("reference", encoding="utf-8")
+    prediction = tmp_path / name
+    if data is not None:
+        prediction.write_bytes(data)
+
+    assert main(["evaluate-ocr", str(reference), str(prediction)]) == 2
+    assert message in capsys.readouterr().err
+
+
+def test_cli_evaluation_rejects_non_regular_input(tmp_path: Path) -> None:
+    with pytest.raises(OcrEvaluationError, match="regular"):
+        pagetrace.cli._read_evaluation_text(tmp_path)

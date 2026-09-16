@@ -3,12 +3,14 @@ from importlib.metadata import version
 
 import pagetrace
 import pagetrace.extraction
+import pagetrace.ocr
 
 
 def test_package_imports() -> None:
     """The installed top-level package is importable."""
     assert pagetrace.__name__ == "pagetrace"
     assert pagetrace.extraction.__name__ == "pagetrace.extraction"
+    assert pagetrace.ocr.__name__ == "pagetrace.ocr"
 
 
 def test_package_version_matches_distribution_metadata() -> None:

@@ -9,6 +9,13 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 
 ### Added
 
+- Routed Milestone 2B OCR for verified `OCR_CANDIDATE` and policy-eligible sparse pages using
+  RapidOCR with bundled PP-OCR models, CPU ONNX Runtime, and PDFium rendering for selected PDF pages.
+- Immutable schema-v1 OCR artifacts with document/text-routing provenance, engine/backend/renderer
+  versions, bundled-model fingerprints, deterministic identity, canonical JSON, atomic storage,
+  content checksums, and integrity-checked readback.
+- Typed OCR page/pixel/line/character limits, candidates-only routing option, CLI/Python APIs, and
+  exact-match/CER/WER evaluation without hidden text normalization.
 - Initial `src/`-layout Python package with a PEP 561 typing marker.
 - Standards-based Hatchling packaging metadata for development version `0.1.0.dev0`.
 - Ruff, strict mypy, pytest, branch coverage, build, and distribution validation configuration.

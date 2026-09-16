@@ -17,7 +17,7 @@ python -m venv .venv
 # Linux/macOS: source .venv/bin/activate
 # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,ocr]"
 ```
 
 The editable installation is required so tests import the installed `src/` package rather than
@@ -54,8 +54,12 @@ python -m pip install dist/*.whl
 python -I -c "import pagetrace; print(pagetrace.__name__)"
 pagetrace --help
 pagetrace extract-text --help
+pagetrace ocr --help
+pagetrace inspect-ocr --help
+pagetrace evaluate-ocr --help
 python -I -m pagetrace --help
 python -I -m pagetrace extract-text --help
+python -I -m pagetrace ocr --help
 ```
 
 The smoke test must use the wheel's interpreter and must not rely on an editable installation,
@@ -99,9 +103,22 @@ not a resolved-quality claim and remains eligible for future OCR routing/evaluat
 Character limits bound accepted output after pypdf returns; they do not sandbox its CPU or memory
 use. pypdf remains in-process without subprocess, time, or memory isolation.
 
-pypdf is reused for embedded text, so Milestone 2A adds no runtime dependency. A future OCR engine
-or other new runtime dependency requires separate capability, security, license, size, and
-evaluation review.
+pypdf is reused for embedded text, so Milestone 2A adds no runtime dependency. OCR dependencies are
+isolated in the optional `ocr` extra and require separate capability, security, license, size, and
+evaluation review when changed.
+
+## OCR and evaluation changes
+
+OCR must start from a verified Milestone 2A text artifact and render only pages selected by the
+captured routing policy. Keep RapidOCR, ONNX Runtime, and pypdfium2 behind the optional `ocr` extra;
+the base wheel and CLI help must remain importable without them. Do not download models at runtime.
+The selected profile uses model files bundled in the RapidOCR wheel and fingerprints their bytes.
+
+Preserve exact OCR output; do not silently normalize, correct, translate, or fabricate text. Enforce
+page, pixel, line, and character limits without truncation or partial artifact persistence. Engine,
+inference, renderer, model-byte, source-routing, configuration, and document provenance must remain
+part of the immutable artifact contract. Accuracy tests must use declared reference text and report
+transparent exact/CER/WER measurements without claiming general language or document quality.
 
 ## Git hygiene
 

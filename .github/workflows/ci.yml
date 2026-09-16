@@ -48,7 +48,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install project and development tools
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -e ".[dev,ocr]"
       - name: Run tests with enforced coverage
         run: pytest
 
@@ -76,8 +76,12 @@ jobs:
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -m pip install dist/*.whl
           cd "${RUNNER_TEMP}"
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -c \
-            "import pagetrace, pagetrace.extraction; print(pagetrace.__name__, pagetrace.__file__)"
+            "import pagetrace, pagetrace.extraction, pagetrace.ocr; print(pagetrace.__name__, pagetrace.__file__)"
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" extract-text --help
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" ocr --help
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" inspect-ocr --help
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" evaluate-ocr --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace extract-text --help
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace ocr --help

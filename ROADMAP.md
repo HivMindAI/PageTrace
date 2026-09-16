@@ -16,17 +16,22 @@ stable identity, safe paths, limits, and auditable page manifests.
 The accepted implementation is merged on `main`. It remains unreleased while later development
 milestones continue.
 
-## Milestone 2A — Deterministic Text Extraction & OCR Routing (implementation pending acceptance)
+## Milestone 2A — Deterministic Text Extraction & OCR Routing (complete)
 
 Extract embedded PDF text with deterministic provenance and immutable derived artifacts. Route
 pages with no usable embedded text, sparse embedded text, and image documents explicitly for
 future OCR consideration without fabricating OCR output.
 
-## Milestone 2B — OCR Engine & Evaluation (planned)
+## Milestone 2B — OCR Engine & Evaluation (implementation pending acceptance)
 
 Select and integrate a real OCR engine, render only routed pages, and establish representative OCR
 fixtures and measured evaluation. Engine choice, model downloads, image preprocessing, language
 coverage, and OCR accuracy claims belong here rather than Milestone 2A.
+
+The current implementation uses RapidOCR with bundled PP-OCR models and the CPU ONNX Runtime
+backend. PDFium renders only pages selected by the immutable Milestone 2A routing artifact. Exact
+text, character-error-rate, and word-error-rate evaluation is available without hidden
+normalization. This implementation remains subject to milestone review and acceptance.
 
 ## Milestone 3 — Structured Document Representation
 

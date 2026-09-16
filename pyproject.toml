@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "pagetrace"
 version = "0.1.0.dev0"
-description = "Deterministic ingestion and text extraction for provenance-first documents."
+description = "Deterministic ingestion, text extraction, and routed OCR for documents."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
@@ -30,6 +30,11 @@ dependencies = [
 pagetrace = "pagetrace.cli:main"
 
 [project.optional-dependencies]
+ocr = [
+  "onnxruntime>=1.22,<2",
+  "pypdfium2>=5,<6",
+  "rapidocr>=3.9,<4",
+]
 dev = [
   "build>=1.2,<2",
   "mypy>=1.14,<2",
