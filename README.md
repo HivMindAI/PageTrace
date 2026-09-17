@@ -18,8 +18,9 @@ PageTrace is guided by four ideas:
 
 PageTrace is **pre-alpha**. Milestones 0, 1, and 2A are complete. Milestone 2B routed OCR,
 Milestone 3 structured representation, Milestone 4 provenance-aware corpus construction,
-Milestone 5 retrieval baselines/evaluation, Milestone 6 evidence-grounded QA, and Milestone 7
-consolidated quality evaluation are implemented and pending acceptance. The current package can:
+Milestone 5 retrieval baselines/evaluation, Milestone 6 evidence-grounded QA, Milestone 7
+consolidated quality evaluation, and Milestone 8 product backend are implemented and pending
+acceptance. The current package can:
 
 - stage untrusted local PDF, PNG, and JPEG files under explicit byte/page/pixel limits;
 - identify supported media from content signatures and confirm it with pypdf or Pillow;
@@ -48,7 +49,11 @@ consolidated quality evaluation are implemented and pending acceptance. The curr
 - produce deterministic extractive answers made only from exact retrieved-text slices; and
 - preserve complete retrieval, chunk, page, region, and character-offset evidence or abstain with
   an explicit reason;
-- consolidate text, retrieval, answer, provenance, safety, human-review, and resource metrics; and
+- consolidate text, retrieval, answer, provenance, safety, human-review, and resource metrics;
+- durably queue bounded ingestion, QA, and quality workflows with idempotency, retries,
+  cancellation, recovery, lifecycle events, and persistent operational counts;
+- expose those workflows through an authenticated loopback JSON API and a separate background
+  worker/operator CLI; and
 - apply explicit quality gates and directional baseline-regression rules with CI-friendly status
   codes.
 
@@ -82,7 +87,9 @@ extractive evidence-grounded QA with explicit abstention (Milestone 6 pending ac
         |
 cross-stage metrics, human rubrics, gates, and regressions (Milestone 7 pending acceptance)
         |
-product backend and evidence-first experiences (planned)
+durable authenticated product backend (Milestone 8 pending acceptance)
+        |
+evidence-first web product (planned)
 ```
 
 See [ROADMAP.md](ROADMAP.md) for milestone scope boundaries.
@@ -460,6 +467,46 @@ gates, regressions, findings, and a content checksum. Canonical strict JSON is e
 output and is not silently persisted; suites may embed sensitive QA retrieval text and must be
 handled accordingly.
 
+The Milestone 8 backend persists canonical workflow requests, results, public errors, and ordered
+lifecycle events in a schema-v1 SQLite database. Submission idempotency binds one caller-provided
+key to the workflow and canonical request fingerprint. Workers claim jobs atomically, enforce
+bounded attempts and result sizes, and recover jobs left running after a coordinated single-host
+process stop. The built-in HTTP server binds only to loopback, requires a 32–512 character bearer
+token for all `/v1` routes, and exposes unauthenticated liveness/readiness checks without document
+data.
+
+Initialize a local backend, run a worker, or serve the API with:
+
+```bash
+pagetrace-backend --database .pagetrace/backend.sqlite3 init
+pagetrace-backend --database .pagetrace/backend.sqlite3 worker
+# Set PAGETRACE_BACKEND_TOKEN to a high-entropy secret first.
+pagetrace-backend --database .pagetrace/backend.sqlite3 serve
+```
+
+Authenticated routes are `POST /v1/jobs`, `GET /v1/jobs/{job_id}`,
+`GET /v1/jobs/{job_id}/events`, `POST /v1/jobs/{job_id}/cancel`, and
+`GET /v1/metrics`. `GET /healthz` and `GET /readyz` expose status only. A submission body has the
+following stable envelope:
+
+```json
+{
+  "workflow": "ingest_document",
+  "request": {"source_path": "incoming/example.pdf"},
+  "idempotency_key": "upload-2026-0001",
+  "max_attempts": 3
+}
+```
+
+`ingest_document` accepts `source_path` under the configured input root. `answer_question` accepts
+`document_id`, `corpus_artifact_id`, `question`, and optional QA/retrieval bounds.
+`evaluate_quality` accepts a canonical suite object and an optional baseline report object. Unknown
+workflow fields are rejected rather than ignored.
+
+The HTTP boundary is deliberately single-host and standard-library based. Put a separately
+hardened TLS reverse proxy in front of it if another local application needs access; do not expose
+the built-in server directly to an untrusted network.
+
 ## Security boundary and limits
 
 Milestone 1 rejects missing paths, directories, symbolic-link inputs, empty/unsupported/malformed
@@ -506,6 +553,14 @@ Quality evaluation adds no parser, model, network request, or document execution
 already validated metric/result objects, records no reviewer identity or free-text review, and
 applies a 512 MiB CLI input ceiling. Quality metrics and gates describe measured fixtures only;
 they are not proof of general correctness, safety, truth, fairness, or production readiness.
+
+The product backend stores workflow requests and results, which may include source paths,
+questions, retrieved evidence, answers, and complete quality suites. Operators must protect and
+expire the SQLite database and artifact store according to their data-retention requirements.
+Bearer authentication is not transport encryption; the built-in server is loopback-only and does
+not provide TLS, user accounts, per-user authorization, distributed leases, hard execution
+timeouts, or operating-system isolation. Cancellation of a running in-process handler takes effect
+when that handler returns.
 
 All extracted text remains untrusted document data. PageTrace does not execute embedded commands,
 scripts, URLs, or instruction-like text, and no extracted content should be treated as a system or

@@ -9,6 +9,13 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 
 ### Added
 
+- Milestone 8 standard-library product backend with a durable SQLite job queue, canonical request
+  fingerprints, idempotent submission, bounded retries/results/events, cancellation, interrupted-job
+  recovery, and append-only lifecycle history.
+- Injected deterministic workflow handlers for ingestion, evidence-grounded QA, and quality
+  evaluation; authenticated loopback JSON endpoints for jobs, events, metrics, health, and
+  readiness; and a `pagetrace-backend` operator CLI with separate initialization, worker, and
+  serving modes.
 - Milestone 7 canonical cross-stage quality suites and reports consolidating text-error, retrieval,
   answer, provenance, safety, structured human-review, and deterministic resource metrics.
 - Explicit metric gates, minimum sample floors, directional baseline-regression rules, stable

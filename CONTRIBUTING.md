@@ -59,6 +59,7 @@ pagetrace inspect-ocr --help
 pagetrace evaluate-ocr --help
 pagetrace structure --help
 pagetrace inspect-structure --help
+pagetrace-backend --help
 python -I -m pagetrace --help
 python -I -m pagetrace extract-text --help
 python -I -m pagetrace ocr --help

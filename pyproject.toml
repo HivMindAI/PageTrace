@@ -28,6 +28,7 @@ dependencies = [
 
 [project.scripts]
 pagetrace = "pagetrace.cli:main"
+pagetrace-backend = "pagetrace.backend.cli:main"
 
 [project.optional-dependencies]
 ocr = [

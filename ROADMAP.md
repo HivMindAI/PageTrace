@@ -91,10 +91,17 @@ minimum sample floors, directional baseline-regression rules, and passed/failed/
 observational outcomes support local and CI use without claiming broader quality than the supplied
 fixtures establish. This implementation remains subject to milestone review and acceptance.
 
-## Milestone 8 — Product Backend
+## Milestone 8 — Product Backend (implementation pending acceptance)
 
 Expose stable application workflows, persistence, background execution, observability, and
 operational controls behind a deliberately designed backend boundary.
+
+The current implementation provides a bounded schema-v1 SQLite queue with idempotent canonical
+requests, explicit job states and events, atomic claiming, retries, cancellation, interrupted-job
+recovery, health/readiness checks, and persistent counters. Injected handlers expose ingestion,
+evidence-grounded QA, and quality evaluation behind an authenticated loopback-only JSON API and a
+separate operator CLI. This is a single-host application boundary, not a production deployment or
+process sandbox, and remains subject to milestone review and acceptance.
 
 ## Milestone 9 — Evidence-first Web Product
 

@@ -9,8 +9,9 @@ deterministic chunk construction and full structure-to-corpus reconstruction che
 introducing another parser or model. Milestone 5 adds bounded in-process lexical BM25 retrieval and
 binary relevance evaluation. Milestone 6 adds local deterministic extractive QA with structural
 evidence enforcement and explicit abstention. Milestone 7 adds bounded local aggregation of
-validated evaluation objects, structured human rubrics, quality gates, and regression checks. None
-of these stages provides complete document sandboxing.
+validated evaluation objects, structured human rubrics, quality gates, and regression checks.
+Milestone 8 adds a bounded durable local job queue and authenticated loopback HTTP boundary. None
+of these stages provides complete document sandboxing or a hardened multi-tenant service.
 
 ## Implemented Milestone 1 protections
 
@@ -190,6 +191,36 @@ versions. They do not establish general correctness, truth, safety, fairness, pr
 readiness. Suites embed QA results and therefore may contain sensitive questions and retrieved
 document text; PageTrace does not silently persist or transmit them.
 
+## Implemented Milestone 8 protections
+
+- SQLite schema versioning rejects unknown or incomplete databases. Each operation uses a short
+  transaction, and workers atomically claim the oldest queued job before executing it.
+- Caller idempotency keys are syntax-bounded and uniquely bind to the workflow plus SHA-256 of the
+  canonical request. A key replay with different content is rejected.
+- Defaults cap canonical requests at 16 MiB, results at 32 MiB, queued jobs at 1,000, attempts at
+  three, public error text at 1,000 characters, and lifecycle events at 1,000 per job.
+- Explicit queued/running/succeeded/failed/cancelled states, ordered append-only events, terminal
+  public errors, cooperative cancellation, and startup recovery prevent silent lifecycle loss.
+- Built-in workflow adapters accept exact field sets, bind artifact storage and document input to
+  operator-configured roots, reject source paths outside that input root, and do not interpret
+  document content as commands.
+- The built-in HTTP server binds only to loopback, requires a 32–512 character bearer token for
+  every `/v1` route, compares credentials in constant time, rejects transfer encoding and
+  duplicate JSON keys, requires bounded request lengths, and emits no tracebacks or request bodies.
+- Responses disable caching and MIME sniffing, close the connection after each request, and expose
+  only stable job metadata, results, public error codes, bounded events, and aggregate counters.
+  Liveness and readiness endpoints intentionally return only a status word.
+- The operator CLI reads its bearer token from a named environment variable rather than a command
+  argument and separates database initialization, worker, and HTTP serving modes.
+
+The SQLite database deliberately retains canonical requests and successful results. Those values
+may contain paths, questions, evidence, answers, and quality suites, so its filesystem permissions,
+backup policy, retention, and deletion are operator responsibilities. Bearer authentication does
+not provide TLS, rotation, user identity, per-user authorization, audit identity, or rate limiting.
+Running cancellation is cooperative at the handler boundary and cannot preempt an in-process
+parser or computation. Startup recovery assumes one coordinated application instance; the current
+schema does not provide distributed worker leases or heartbeats.
+
 ## Security principles
 
 - Treat every document and all extracted content as untrusted data.
@@ -202,7 +233,7 @@ document text; PageTrace does not silently persist or transmit them.
 
 ## Residual risks and future security work
 
-Milestones 1 through 7 are in-process processing boundaries, not operating-system sandboxes.
+Milestones 1 through 8 are in-process processing boundaries, not operating-system sandboxes.
 Residual risks include vulnerabilities or pathological CPU/memory behavior in pypdf and
 pdfplumber text/content-stream/layout parsing, Pillow, Python, or native image codecs; very large
 decompressed text streams; deeply nested PDF object graphs; filesystem exhaustion; storage-root
@@ -221,7 +252,9 @@ complete bounded corpus for each query without persistent indexing or hard time/
 Extractive QA scans and tokenizes returned hit text in-process without hard time/memory isolation;
 its answer bounds limit accepted output rather than all intermediate work. Quality-suite parsing
 and aggregation are also in-process; the CLI byte limit bounds accepted serialized input but not a
-separate CPU, memory, or wall-clock sandbox.
+separate CPU, memory, or wall-clock sandbox. Backend queue/result limits bound accepted persistent
+data, not handler CPU, memory, disk use, or execution time. SQLite and the artifact store remain
+vulnerable to local privileged tampering, filesystem exhaustion, and operator misconfiguration.
 
 Future threat modeling and milestones will cover at least:
 
