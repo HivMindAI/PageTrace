@@ -7,7 +7,9 @@ Milestone 2B adds bounded, routed PDFium rendering and RapidOCR inference. Miles
 pdfplumber layout/table parsing and deterministic OCR geometry replay. Milestone 4 adds bounded
 deterministic chunk construction and full structure-to-corpus reconstruction checks without
 introducing another parser or model. Milestone 5 adds bounded in-process lexical BM25 retrieval and
-binary relevance evaluation. None of these stages provides complete document sandboxing.
+binary relevance evaluation. Milestone 6 adds local deterministic extractive QA with structural
+evidence enforcement and explicit abstention. None of these stages provides complete document
+sandboxing.
 
 ## Implemented Milestone 1 protections
 
@@ -138,6 +140,30 @@ through the linked structured artifact and are not duplicated into speculative t
 Retrieval scores measure lexical overlap, not truth, semantic equivalence, or answer support.
 Queries and matched document text remain untrusted data and are never executed.
 
+## Implemented Milestone 6 protections
+
+- QA operates only on a validated retrieval result and introduces no language model, external
+  service, parser, downloader, tool call, or document-instruction execution path.
+- Answer text must equal exact character slices of retrieved hit text joined only by the configured
+  separator. Every citation is rechecked against retrieval rank, chunk identity, offsets, matched
+  query terms, and coverage during model construction and deserialization.
+- The canonical result embeds the complete retrieval result, retaining document/corpus/chunk/page,
+  coordinate, bounding-region, tokenizer, BM25, and query provenance needed to inspect a citation.
+- Explicit typed configuration caps evidence items at 100 and answer text at 100,000 characters;
+  defaults are three excerpts and 4,000 characters. Retrieval query limits remain in force.
+- PageTrace abstains for no retrieval hits, insufficient unique query-term coverage, or an answer
+  character limit that cannot preserve a supported excerpt. Abstention is a typed result, not
+  fabricated fallback text.
+- Strict canonical schema-v1 JSON rejects duplicate/unknown fields, malformed or non-finite values,
+  changed evidence, unsupported answer text, checksum contradictions, and invalid state pairings.
+- Questions, retrieved evidence, and answers are returned or serialized only when requested and
+  are not silently persisted or sent to an external service.
+
+Lexical overlap does not prove truth, completeness, entailment, or semantic relevance. Extracted
+evidence may itself be wrong, malicious, out of context, or the result of an upstream extraction
+error. Exact-source enforcement prevents unsupported generated wording; it does not validate the
+source's claims.
+
 ## Security principles
 
 - Treat every document and all extracted content as untrusted data.
@@ -150,7 +176,7 @@ Queries and matched document text remain untrusted data and are never executed.
 
 ## Residual risks and future security work
 
-Milestones 1 through 5 are in-process processing boundaries, not operating-system sandboxes.
+Milestones 1 through 6 are in-process processing boundaries, not operating-system sandboxes.
 Residual risks include vulnerabilities or pathological CPU/memory behavior in pypdf and
 pdfplumber text/content-stream/layout parsing, Pillow, Python, or native image codecs; very large
 decompressed text streams; deeply nested PDF object graphs; filesystem exhaustion; storage-root
@@ -166,6 +192,8 @@ returned data. PageTrace does not claim CPU, memory, time, subprocess, parser, o
 isolation. Corpus limits bound accepted output but construction and canonical serialization may
 still consume memory proportional to the verified structured input. BM25 currently tokenizes the
 complete bounded corpus for each query without persistent indexing or hard time/memory isolation.
+Extractive QA scans and tokenizes returned hit text in-process without hard time/memory isolation;
+its answer bounds limit accepted output rather than all intermediate work.
 
 Future threat modeling and milestones will cover at least:
 

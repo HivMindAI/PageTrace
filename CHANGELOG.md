@@ -9,6 +9,12 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 
 ### Added
 
+- Milestone 6 deterministic extractive QA whose answer text is restricted to exact retrieved
+  character slices, with stable evidence selection, embedded retrieval provenance, strict
+  citation/offset verification, and canonical schema-v1 result identity and checksums.
+- Explicit no-hit, insufficient-coverage, and answer-limit abstention; typed evidence/answer bounds;
+  Python APIs; an `answer` CLI command; security documentation; tests; and clean-wheel smoke
+  coverage without language-model or external-service dependencies.
 - Milestone 5 deterministic Unicode-tokenized Okapi BM25 retrieval with stable ranking, exact
   corpus/chunk/page/region provenance, query limits, canonical result identities, and checksums.
 - Canonical binary relevance datasets plus Precision@k, Recall@k, MRR, MAP, and nDCG evaluation,

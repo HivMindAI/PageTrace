@@ -11,6 +11,7 @@ from pagetrace.corpus import CorpusLimitError, build_corpus_artifact
 from pagetrace.documents import ingest_document
 from pagetrace.extraction import ExtractionLimitError, extract_document_text
 from pagetrace.ocr import OcrEvaluationError
+from pagetrace.qa import QaConfig, QaError, answer_from_retrieval
 from pagetrace.retrieval import (
     RetrievalConfig,
     RetrievalEvaluationError,
@@ -513,3 +514,85 @@ def test_cli_retrieval_cutoff_is_bounded(value: str) -> None:
 def test_cli_retrieval_dataset_rejects_non_regular_input(tmp_path: Path) -> None:
     with pytest.raises(RetrievalEvaluationError, match="regular"):
         pagetrace.cli._read_retrieval_dataset(tmp_path)
+
+
+def test_cli_answer_plain_and_json_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    corpus = build_corpus_artifact(corpus_source((("alpha answer.",),)))
+    result = answer_from_retrieval(
+        rank_corpus(corpus, "alpha", configuration=RetrievalConfig(top_k=1)),
+        configuration=QaConfig(max_evidence_items=1),
+    )
+    monkeypatch.setattr(pagetrace.cli, "answer_question", lambda *_args, **_kwargs: result)
+    arguments = [
+        "answer",
+        corpus.document_id,
+        corpus.artifact_id,
+        "alpha",
+        "--top-k",
+        "1",
+        "--max-evidence",
+        "1",
+        "--store",
+        str(tmp_path),
+    ]
+
+    assert main(arguments) == 0
+    output = capsys.readouterr().out
+    assert f"answer id: {result.answer_id}" in output
+    assert "status: answered" in output
+    assert "[1] page 1, chunk 1" in output
+
+    assert main([*arguments, "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["answer"] == "alpha answer."
+    assert payload["citations"][0]["chunk_id"] == corpus.chunks[0].chunk_id
+
+
+def test_cli_answer_abstention_and_error_are_explicit(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    corpus = build_corpus_artifact(corpus_source((("alpha",),)))
+    abstained = answer_from_retrieval(rank_corpus(corpus, "missing"))
+    monkeypatch.setattr(pagetrace.cli, "answer_question", lambda *_args, **_kwargs: abstained)
+    arguments = ["answer", corpus.document_id, corpus.artifact_id, "missing"]
+
+    assert main(arguments) == 0
+    assert "abstention reason: no_retrieval_hits" in capsys.readouterr().out
+
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise QaError("answer failed safely")
+
+    monkeypatch.setattr(pagetrace.cli, "answer_question", fail)
+    assert main(arguments) == 2
+    assert capsys.readouterr().err == "pagetrace: error: answer failed safely\n"
+
+
+@pytest.mark.parametrize(
+    ("option", "value"),
+    [
+        ("--max-evidence", "0"),
+        ("--max-evidence", "101"),
+        ("--max-answer-characters", "0"),
+        ("--max-answer-characters", "100001"),
+        ("--minimum-coverage", "0"),
+        ("--minimum-coverage", "1.1"),
+        ("--minimum-coverage", "not-a-number"),
+    ],
+)
+def test_cli_answer_bounds_are_enforced(option: str, value: str) -> None:
+    with pytest.raises(SystemExit) as error:
+        build_parser().parse_args(
+            [
+                "answer",
+                f"sha256-{'1' * 64}",
+                f"corpus-sha256-{'2' * 64}",
+                "question",
+                option,
+                value,
+            ]
+        )
+    assert error.value.code == 2

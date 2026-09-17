@@ -67,10 +67,16 @@ configuration provenance. Canonical binary-relevance datasets and evaluations re
 Recall@k, MRR, MAP, and nDCG. Queries and evaluations are serializable but are not silently retained.
 This implementation remains subject to milestone review and acceptance.
 
-## Milestone 6 — Evidence-grounded QA
+## Milestone 6 — Evidence-grounded QA (implementation pending acceptance)
 
 Generate answers only from retrieved evidence, preserve source attribution, and define abstention
 and unsupported-claim behavior.
+
+The current implementation provides a deterministic extractive baseline whose answer text is
+restricted to exact character slices of BM25 hits. Canonical schema-v1 results embed the complete
+retrieval result, attach chunk/rank/offset citations, enforce configurable query-term coverage and
+output bounds, and explicitly abstain for no hits, weak evidence, or unusable answer limits. This
+implementation remains subject to milestone review and acceptance.
 
 ## Milestone 7 — Evaluation & Quality System
 

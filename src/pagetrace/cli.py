@@ -42,6 +42,7 @@ from pagetrace.ocr import (
     serialize_ocr_artifact,
     serialize_ocr_evaluation,
 )
+from pagetrace.qa import QaConfig, QaError, QaResult, answer_question, serialize_qa_result
 from pagetrace.retrieval import (
     RetrievalConfig,
     RetrievalDataset,
@@ -216,6 +217,38 @@ def build_parser() -> argparse.ArgumentParser:
     retrieval_evaluation_parser.add_argument(
         "--json", action="store_true", help="emit canonical retrieval evaluation JSON"
     )
+
+    answer_parser = subparsers.add_parser(
+        "answer", help="answer only with exact excerpts from retrieved evidence"
+    )
+    answer_parser.add_argument("document_id", help="verified PageTrace document identifier")
+    answer_parser.add_argument("corpus_artifact_id", help="verified corpus artifact identifier")
+    answer_parser.add_argument("question", help="untrusted question text")
+    answer_parser.add_argument(
+        "--top-k", type=_retrieval_top_k, default=10, help="retrieval cutoff (1-1000)"
+    )
+    answer_parser.add_argument(
+        "--max-evidence",
+        type=_qa_max_evidence,
+        default=3,
+        help="maximum cited excerpts (1-100)",
+    )
+    answer_parser.add_argument(
+        "--max-answer-characters",
+        type=_qa_max_answer_characters,
+        default=4_000,
+        help="maximum answer characters (1-100000)",
+    )
+    answer_parser.add_argument(
+        "--minimum-coverage",
+        type=_qa_minimum_coverage,
+        default=0.25,
+        help="minimum unique query-term coverage per excerpt (>0 through 1)",
+    )
+    answer_parser.add_argument("--store", type=Path, default=Path(".pagetrace"))
+    answer_parser.add_argument(
+        "--json", action="store_true", help="emit the canonical evidence-grounded QA result"
+    )
     return parser
 
 
@@ -226,6 +259,42 @@ def _retrieval_top_k(value: str) -> int:
         raise argparse.ArgumentTypeError("top-k must be an integer from 1 to 1000") from exc
     if not 1 <= parsed <= 1_000:
         raise argparse.ArgumentTypeError("top-k must be an integer from 1 to 1000")
+    return parsed
+
+
+def _qa_max_evidence(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("max-evidence must be an integer from 1 to 100") from exc
+    if not 1 <= parsed <= 100:
+        raise argparse.ArgumentTypeError("max-evidence must be an integer from 1 to 100")
+    return parsed
+
+
+def _qa_max_answer_characters(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "max-answer-characters must be an integer from 1 to 100000"
+        ) from exc
+    if not 1 <= parsed <= 100_000:
+        raise argparse.ArgumentTypeError(
+            "max-answer-characters must be an integer from 1 to 100000"
+        )
+    return parsed
+
+
+def _qa_minimum_coverage(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "minimum-coverage must be greater than 0 and at most 1"
+        ) from exc
+    if not 0 < parsed <= 1:
+        raise argparse.ArgumentTypeError("minimum-coverage must be greater than 0 and at most 1")
     return parsed
 
 
@@ -314,7 +383,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 configuration=RetrievalConfig(top_k=arguments.top_k),
             )
             _print_retrieval_result(retrieval_result, as_json=arguments.json)
-        else:
+        elif arguments.command == "evaluate-retrieval":
             corpus_artifact = load_corpus_artifact(
                 arguments.corpus_artifact_id,
                 document_id=arguments.document_id,
@@ -326,6 +395,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                 configuration=RetrievalConfig(top_k=arguments.top_k),
             )
             _print_retrieval_evaluation(retrieval_evaluation, as_json=arguments.json)
+        else:
+            qa_result = answer_question(
+                arguments.document_id,
+                arguments.corpus_artifact_id,
+                arguments.question,
+                store=arguments.store,
+                retrieval_configuration=RetrievalConfig(top_k=arguments.top_k),
+                configuration=QaConfig(
+                    max_evidence_items=arguments.max_evidence,
+                    max_answer_characters=arguments.max_answer_characters,
+                    minimum_query_term_coverage=arguments.minimum_coverage,
+                ),
+            )
+            _print_qa_result(qa_result, as_json=arguments.json)
     except (
         DocumentError,
         ExtractionError,
@@ -333,6 +416,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         StructureError,
         CorpusError,
         RetrievalError,
+        QaError,
     ) as exc:
         print(f"pagetrace: error: {exc}", file=sys.stderr)
         return 2
@@ -473,6 +557,29 @@ def _print_retrieval_evaluation(evaluation: RetrievalEvaluation, *, as_json: boo
     print(f"recall: {evaluation.mean_recall:.12f}")
     print(f"MAP: {evaluation.mean_average_precision:.12f}")
     print(f"nDCG: {evaluation.mean_ndcg:.12f}")
+
+
+def _print_qa_result(result: QaResult, *, as_json: bool) -> None:
+    if as_json:
+        sys.stdout.buffer.write(serialize_qa_result(result))
+        return
+    print(f"answer id: {result.answer_id}")
+    print(f"retrieval result id: {result.retrieval.result_id}")
+    print(f"status: {result.status.value}")
+    if result.answer is None:
+        assert result.abstention_reason is not None
+        print(f"abstention reason: {result.abstention_reason.value}")
+        return
+    print("answer:")
+    print(result.answer)
+    print("evidence:")
+    for citation in result.citations:
+        hit = result.retrieval.hits[citation.retrieval_rank - 1]
+        print(
+            f"[{citation.citation_index}] page {hit.page_number}, chunk {hit.chunk_index}, "
+            f"characters {citation.excerpt_start}:{citation.excerpt_end}, "
+            f"coverage {citation.query_term_coverage:.12f} ({citation.chunk_id})"
+        )
 
 
 def _read_evaluation_text(path: Path) -> str:
