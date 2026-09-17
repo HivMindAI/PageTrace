@@ -43,6 +43,17 @@ from pagetrace.ocr import (
     serialize_ocr_evaluation,
 )
 from pagetrace.qa import QaConfig, QaError, QaResult, answer_question, serialize_qa_result
+from pagetrace.quality import (
+    QualityError,
+    QualityInputError,
+    QualityReport,
+    QualityReportStatus,
+    QualitySuite,
+    deserialize_quality_report,
+    deserialize_quality_suite,
+    evaluate_quality,
+    serialize_quality_report,
+)
 from pagetrace.retrieval import (
     RetrievalConfig,
     RetrievalDataset,
@@ -66,6 +77,7 @@ from pagetrace.structure import (
 
 _MAX_EVALUATION_TEXT_BYTES = 20 * 1024 * 1024
 _MAX_RETRIEVAL_DATASET_BYTES = 20 * 1024 * 1024
+_MAX_QUALITY_INPUT_BYTES = 512 * 1024 * 1024
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -249,6 +261,17 @@ def build_parser() -> argparse.ArgumentParser:
     answer_parser.add_argument(
         "--json", action="store_true", help="emit the canonical evidence-grounded QA result"
     )
+
+    quality_parser = subparsers.add_parser(
+        "evaluate-quality", help="evaluate a canonical cross-stage quality suite"
+    )
+    quality_parser.add_argument("suite", type=Path, help="canonical quality-suite JSON")
+    quality_parser.add_argument(
+        "--baseline", type=Path, help="optional canonical quality report for regression checks"
+    )
+    quality_parser.add_argument(
+        "--json", action="store_true", help="emit the canonical quality report"
+    )
     return parser
 
 
@@ -395,7 +418,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 configuration=RetrievalConfig(top_k=arguments.top_k),
             )
             _print_retrieval_evaluation(retrieval_evaluation, as_json=arguments.json)
-        else:
+        elif arguments.command == "answer":
             qa_result = answer_question(
                 arguments.document_id,
                 arguments.corpus_artifact_id,
@@ -409,6 +432,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                 ),
             )
             _print_qa_result(qa_result, as_json=arguments.json)
+        else:
+            quality_report = evaluate_quality(
+                _read_quality_suite(arguments.suite),
+                baseline=(
+                    _read_quality_report(arguments.baseline)
+                    if arguments.baseline is not None
+                    else None
+                ),
+            )
+            _print_quality_report(quality_report, as_json=arguments.json)
+            if quality_report.status is QualityReportStatus.FAILED:
+                return 1
+            if quality_report.status is QualityReportStatus.INCOMPLETE:
+                return 3
     except (
         DocumentError,
         ExtractionError,
@@ -417,6 +454,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         CorpusError,
         RetrievalError,
         QaError,
+        QualityError,
     ) as exc:
         print(f"pagetrace: error: {exc}", file=sys.stderr)
         return 2
@@ -582,6 +620,36 @@ def _print_qa_result(result: QaResult, *, as_json: bool) -> None:
         )
 
 
+def _print_quality_report(report: QualityReport, *, as_json: bool) -> None:
+    if as_json:
+        sys.stdout.buffer.write(serialize_quality_report(report))
+        return
+    print(f"quality report id: {report.report_id}")
+    print(f"suite id: {report.suite_id}")
+    print(f"policy: {report.policy.policy_id}")
+    print(f"status: {report.status.value}")
+    print("metrics:")
+    for observation in report.metrics:
+        print(
+            f"  {observation.metric.value}: {observation.value:.12f} (n={observation.sample_count})"
+        )
+    if report.gates:
+        print("gates:")
+        for gate_result in report.gates:
+            print(f"  {gate_result.gate.metric.value}: {gate_result.status.value}")
+    if report.regressions:
+        print("regressions:")
+        for regression_result in report.regressions:
+            print(f"  {regression_result.rule.metric.value}: {regression_result.status.value}")
+    print(f"findings: {len(report.findings)}")
+    for finding in report.findings:
+        location = f" [{finding.case_id}]" if finding.case_id is not None else ""
+        print(
+            f"  {finding.severity.value} {finding.dimension.value}/{finding.code}"
+            f"{location}: {finding.message}"
+        )
+
+
 def _read_evaluation_text(path: Path) -> str:
     try:
         metadata = path.lstat()
@@ -621,3 +689,28 @@ def _read_retrieval_dataset(path: Path) -> RetrievalDataset:
     if len(data) != metadata.st_size:
         raise RetrievalEvaluationError("retrieval dataset changed while it was read")
     return deserialize_retrieval_dataset(data)
+
+
+def _read_quality_suite(path: Path) -> QualitySuite:
+    return deserialize_quality_suite(_read_quality_input(path, "quality suite"))
+
+
+def _read_quality_report(path: Path) -> QualityReport:
+    return deserialize_quality_report(_read_quality_input(path, "quality baseline"))
+
+
+def _read_quality_input(path: Path, label: str) -> bytes:
+    try:
+        metadata = path.lstat()
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+            raise QualityInputError(f"{label} must be a regular non-symlink file")
+        if metadata.st_size > _MAX_QUALITY_INPUT_BYTES:
+            raise QualityInputError(f"{label} exceeds {_MAX_QUALITY_INPUT_BYTES} bytes")
+        data = path.read_bytes()
+    except QualityInputError:
+        raise
+    except OSError as exc:
+        raise QualityInputError(f"{label} could not be read") from exc
+    if len(data) != metadata.st_size:
+        raise QualityInputError(f"{label} changed while it was read")
+    return data

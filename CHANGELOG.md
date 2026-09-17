@@ -9,6 +9,11 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 
 ### Added
 
+- Milestone 7 canonical cross-stage quality suites and reports consolidating text-error, retrieval,
+  answer, provenance, safety, structured human-review, and deterministic resource metrics.
+- Explicit metric gates, minimum sample floors, directional baseline-regression rules, stable
+  findings, strict integrity-checked JSON, Python APIs, and an `evaluate-quality` CLI command with
+  distinct passed/failed/incomplete exit behavior and clean-wheel coverage.
 - Milestone 6 deterministic extractive QA whose answer text is restricted to exact retrieved
   character slices, with stable evidence selection, embedded retrieval provenance, strict
   citation/offset verification, and canonical schema-v1 result identity and checksums.

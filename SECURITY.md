@@ -8,8 +8,9 @@ pdfplumber layout/table parsing and deterministic OCR geometry replay. Milestone
 deterministic chunk construction and full structure-to-corpus reconstruction checks without
 introducing another parser or model. Milestone 5 adds bounded in-process lexical BM25 retrieval and
 binary relevance evaluation. Milestone 6 adds local deterministic extractive QA with structural
-evidence enforcement and explicit abstention. None of these stages provides complete document
-sandboxing.
+evidence enforcement and explicit abstention. Milestone 7 adds bounded local aggregation of
+validated evaluation objects, structured human rubrics, quality gates, and regression checks. None
+of these stages provides complete document sandboxing.
 
 ## Implemented Milestone 1 protections
 
@@ -164,6 +165,31 @@ evidence may itself be wrong, malicious, out of context, or the result of an ups
 error. Exact-source enforcement prevents unsupported generated wording; it does not validate the
 source's claims.
 
+## Implemented Milestone 7 protections
+
+- Quality suites accept typed text metrics, integrity-checked retrieval evaluations and QA results,
+  structured numeric human reviews, and an explicit policy. Nested canonical objects are fully
+  revalidated during strict suite deserialization.
+- Human reviews contain only safe case/review identifiers, a rubric version, and four integer
+  scores from 1 to 5. The schema intentionally excludes reviewer identity and free-text notes.
+- Static gates include explicit comparators, thresholds, and minimum sample floors. Missing metrics
+  or insufficient samples become `not_evaluated` and make the report incomplete rather than pass.
+- Baseline regression rules use a versioned higher/lower-is-better direction per supported metric.
+  Missing baselines or samples are explicit; degradation beyond tolerance fails the report.
+- Findings expose stable codes, dimensions, severities, and safe case IDs without reproducing
+  source or answer text. Quality reports checksum every metric, gate, regression, and finding.
+- The CLI accepts only regular non-symlink suite/baseline files, checks stable file size, and caps
+  each canonical input at 512 MiB. Failed, incomplete, malformed, and successful evaluations have
+  distinct exit behavior.
+- Resource metrics count query tokens and retrieved/answer/evidence characters. The current local
+  pipeline records zero external requests and zero estimated external-service cost; it does not
+  invent CPU, memory, energy, latency, or monetary precision that is not measured.
+
+Fixture scores and passing gates apply only to the supplied cases, judgments, policy, and processor
+versions. They do not establish general correctness, truth, safety, fairness, privacy, or production
+readiness. Suites embed QA results and therefore may contain sensitive questions and retrieved
+document text; PageTrace does not silently persist or transmit them.
+
 ## Security principles
 
 - Treat every document and all extracted content as untrusted data.
@@ -176,7 +202,7 @@ source's claims.
 
 ## Residual risks and future security work
 
-Milestones 1 through 6 are in-process processing boundaries, not operating-system sandboxes.
+Milestones 1 through 7 are in-process processing boundaries, not operating-system sandboxes.
 Residual risks include vulnerabilities or pathological CPU/memory behavior in pypdf and
 pdfplumber text/content-stream/layout parsing, Pillow, Python, or native image codecs; very large
 decompressed text streams; deeply nested PDF object graphs; filesystem exhaustion; storage-root
@@ -193,7 +219,9 @@ isolation. Corpus limits bound accepted output but construction and canonical se
 still consume memory proportional to the verified structured input. BM25 currently tokenizes the
 complete bounded corpus for each query without persistent indexing or hard time/memory isolation.
 Extractive QA scans and tokenizes returned hit text in-process without hard time/memory isolation;
-its answer bounds limit accepted output rather than all intermediate work.
+its answer bounds limit accepted output rather than all intermediate work. Quality-suite parsing
+and aggregation are also in-process; the CLI byte limit bounds accepted serialized input but not a
+separate CPU, memory, or wall-clock sandbox.
 
 Future threat modeling and milestones will cover at least:
 

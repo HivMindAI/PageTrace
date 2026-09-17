@@ -78,11 +78,18 @@ retrieval result, attach chunk/rank/offset citations, enforce configurable query
 output bounds, and explicitly abstain for no hits, weak evidence, or unusable answer limits. This
 implementation remains subject to milestone review and acceptance.
 
-## Milestone 7 — Evaluation & Quality System
+## Milestone 7 — Evaluation & Quality System (implementation pending acceptance)
 
 Consolidate automated and human evaluation for extraction, retrieval, answers, provenance, safety,
 regressions, and cost. Evaluation is cross-cutting: fixtures and metrics begin as soon as behavior
 is introduced, well before this dedicated milestone.
+
+The current implementation defines canonical schema-v1 suites and reports that consolidate exact
+text error metrics, retrieval evaluations, expected QA outcomes, citation relevance, structured
+human rubrics, safety findings, and deterministic resource counters. Explicit static gates,
+minimum sample floors, directional baseline-regression rules, and passed/failed/incomplete/
+observational outcomes support local and CI use without claiming broader quality than the supplied
+fixtures establish. This implementation remains subject to milestone review and acceptance.
 
 ## Milestone 8 — Product Backend
 

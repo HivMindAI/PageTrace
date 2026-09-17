@@ -12,6 +12,18 @@ from pagetrace.documents import ingest_document
 from pagetrace.extraction import ExtractionLimitError, extract_document_text
 from pagetrace.ocr import OcrEvaluationError
 from pagetrace.qa import QaConfig, QaError, answer_from_retrieval
+from pagetrace.quality import (
+    MetricComparator,
+    MetricGate,
+    QualityMetricName,
+    QualityPolicy,
+    RegressionRule,
+    TextQualityCase,
+    create_quality_suite,
+    evaluate_quality,
+    serialize_quality_report,
+    serialize_quality_suite,
+)
 from pagetrace.retrieval import (
     RetrievalConfig,
     RetrievalEvaluationError,
@@ -24,6 +36,7 @@ from pagetrace.retrieval import (
 from pagetrace.structure import StructureProcessingError
 from tests.conftest import ImageFactory
 from tests.test_corpus_models import _source as corpus_source
+from tests.test_quality import _full_suite as full_quality_suite
 from tests.test_structure_models import _artifact as structured_artifact
 
 
@@ -596,3 +609,89 @@ def test_cli_answer_bounds_are_enforced(option: str, value: str) -> None:
             ]
         )
     assert error.value.code == 2
+
+
+def test_cli_evaluate_quality_plain_and_json_output(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    suite = full_quality_suite()
+    suite_path = tmp_path / "quality-suite.json"
+    suite_path.write_bytes(serialize_quality_suite(suite))
+
+    assert main(["evaluate-quality", str(suite_path)]) == 0
+    output = capsys.readouterr().out
+    assert f"suite id: {suite.suite_id}" in output
+    assert "status: passed" in output
+    assert "text.exact_match_rate:" in output
+    assert "findings:" in output
+
+    assert main(["evaluate-quality", str(suite_path), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["suite_id"] == suite.suite_id
+    assert payload["status"] == "passed"
+
+
+def test_cli_quality_gate_and_regression_exit_codes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    baseline_suite = create_quality_suite(text_cases=(TextQualityCase("baseline", True, 0.0, 0.0),))
+    baseline_report = evaluate_quality(baseline_suite)
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_bytes(serialize_quality_report(baseline_report))
+
+    failed_suite = create_quality_suite(
+        text_cases=(TextQualityCase("current", False, 1.0, 1.0),),
+        policy=QualityPolicy(
+            policy_id="failed",
+            gates=(
+                MetricGate(
+                    QualityMetricName.TEXT_EXACT_MATCH_RATE,
+                    MetricComparator.AT_LEAST,
+                    1.0,
+                ),
+            ),
+            regression_rules=(RegressionRule(QualityMetricName.TEXT_EXACT_MATCH_RATE),),
+        ),
+    )
+    failed_path = tmp_path / "failed-suite.json"
+    failed_path.write_bytes(serialize_quality_suite(failed_suite))
+
+    assert (
+        main(
+            [
+                "evaluate-quality",
+                str(failed_path),
+                "--baseline",
+                str(baseline_path),
+            ]
+        )
+        == 1
+    )
+    assert "status: failed" in capsys.readouterr().out
+
+    incomplete_suite = create_quality_suite(
+        text_cases=(TextQualityCase("text", True, 0.0, 0.0),),
+        policy=QualityPolicy(
+            policy_id="incomplete",
+            gates=(
+                MetricGate(
+                    QualityMetricName.HUMAN_CORRECTNESS,
+                    MetricComparator.AT_LEAST,
+                    4.0,
+                ),
+            ),
+        ),
+    )
+    incomplete_path = tmp_path / "incomplete-suite.json"
+    incomplete_path.write_bytes(serialize_quality_suite(incomplete_suite))
+    assert main(["evaluate-quality", str(incomplete_path)]) == 3
+    assert "status: incomplete" in capsys.readouterr().out
+
+
+def test_cli_quality_input_failure_is_concise(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["evaluate-quality", str(tmp_path)]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "regular non-symlink" in captured.err

@@ -18,8 +18,8 @@ PageTrace is guided by four ideas:
 
 PageTrace is **pre-alpha**. Milestones 0, 1, and 2A are complete. Milestone 2B routed OCR,
 Milestone 3 structured representation, Milestone 4 provenance-aware corpus construction,
-Milestone 5 retrieval baselines/evaluation, and Milestone 6 evidence-grounded QA are implemented
-and pending acceptance. The current package can:
+Milestone 5 retrieval baselines/evaluation, Milestone 6 evidence-grounded QA, and Milestone 7
+consolidated quality evaluation are implemented and pending acceptance. The current package can:
 
 - stage untrusted local PDF, PNG, and JPEG files under explicit byte/page/pixel limits;
 - identify supported media from content signatures and confirm it with pypdf or Pillow;
@@ -47,7 +47,10 @@ and pending acceptance. The current package can:
 - evaluate binary relevance judgments with Precision@k, Recall@k, MRR, MAP, and nDCG;
 - produce deterministic extractive answers made only from exact retrieved-text slices; and
 - preserve complete retrieval, chunk, page, region, and character-offset evidence or abstain with
-  an explicit reason.
+  an explicit reason;
+- consolidate text, retrieval, answer, provenance, safety, human-review, and resource metrics; and
+- apply explicit quality gates and directional baseline-regression rules with CI-friendly status
+  codes.
 
 An OCR-candidate status remains routing information rather than proof that OCR is necessary or
 accurate. OCR output is untrusted derived data with measured confidence, not verified truth.
@@ -77,7 +80,9 @@ transparent BM25 retrieval and relevance metrics (Milestone 5 pending acceptance
         |
 extractive evidence-grounded QA with explicit abstention (Milestone 6 pending acceptance)
         |
-evaluation consolidation and product experiences (planned)
+cross-stage metrics, human rubrics, gates, and regressions (Milestone 7 pending acceptance)
+        |
+product backend and evidence-first experiences (planned)
 ```
 
 See [ROADMAP.md](ROADMAP.md) for milestone scope boundaries.
@@ -108,7 +113,8 @@ from pagetrace.corpus import build_corpus, load_corpus_artifact
 from pagetrace.documents import ingest_document, load_document
 from pagetrace.extraction import extract_document_text, load_text_extraction
 from pagetrace.ocr import evaluate_ocr, load_ocr_artifact, ocr_document
-from pagetrace.qa import answer_question
+from pagetrace.qa import QaStatus, answer_question
+from pagetrace.quality import AnswerQualityCase, create_quality_suite, evaluate_quality
 from pagetrace.retrieval import (
     RetrievalJudgment,
     create_retrieval_dataset,
@@ -205,6 +211,18 @@ if qa_result.answer is None:
     print("abstained:", qa_result.abstention_reason)
 else:
     print(qa_result.answer, qa_result.citations)
+
+quality_suite = create_quality_suite(
+    answer_cases=(
+        AnswerQualityCase(
+            case_id="revenue-growth-answer",
+            result=qa_result,
+            expected_status=QaStatus.ANSWERED,
+        ),
+    ),
+)
+quality_report = evaluate_quality(quality_suite)
+print(quality_report.status, quality_report.metrics)
 ```
 
 Expected document failures derive from `DocumentError`. More specific public errors distinguish
@@ -306,6 +324,17 @@ abstains explicitly when retrieval has no hits, no excerpt reaches the default 0
 threshold, or the answer limit cannot retain a supported excerpt. QA results are serializable but
 are not silently persisted.
 
+Milestone 7 uses canonical quality suites to combine named text-error fixtures, existing retrieval
+evaluations, expected QA behavior, relevant citation judgments, structured 1-to-5 human reviews,
+and an explicit policy. Reports aggregate exact-match/CER/WER, retrieval MRR/Precision/Recall/MAP/
+nDCG, answer status and exact-match accuracy, citation precision/recall, supported-answer and
+false-answer rates, human rubric means, and deterministic query/retrieved/answer/evidence size
+counters. External request count and estimated external cost are zero for the current local
+pipeline. Static metric gates and directional baseline rules are never silently skipped: missing
+metrics, missing baselines, or insufficient samples produce `incomplete`; violations produce
+`failed`; suites without policy checks are clearly `observational`. Findings identify affected
+cases without storing human free-text notes or reviewer identities.
+
 ## CLI
 
 ```bash
@@ -336,6 +365,7 @@ pagetrace evaluate-retrieval sha256-<64-lowercase-hex-characters> \
 pagetrace answer sha256-<64-lowercase-hex-characters> \
   corpus-sha256-<64-lowercase-hex-characters> "revenue growth" \
   --top-k 10 --minimum-coverage 0.25 --store .pagetrace --json
+pagetrace evaluate-quality quality-suite.json --baseline prior-quality-report.json --json
 
 # The module entry point is equivalent.
 python -m pagetrace ingest annual-report.pdf --store .pagetrace --json
@@ -345,6 +375,10 @@ Plain output reports document or artifact identity, provenance, page counts, and
 `--json` emits the relevant canonical manifest, artifact, or metric object. Expected document,
 extraction, OCR, structure, corpus, retrieval/evaluation, and QA errors are concise, have a
 non-zero exit status, and do not display a traceback.
+
+`evaluate-quality` returns status `0` for passed or observational reports, `1` for failed policy
+checks, `3` when required gates/regressions could not be evaluated, and `2` for malformed or unsafe
+inputs. This makes missing baseline data distinguishable from a measured regression.
 
 ## Artifact and identity design
 
@@ -419,6 +453,13 @@ The full canonical retrieval result is embedded so citation slices can be checke
 ranked source text without a hidden index. QA results are not placed in artifact storage
 automatically because questions, retrieved text, and answers may be sensitive.
 
+Quality suites and reports use schema version `1`. Suite identity covers ordered text fixtures,
+retrieval evaluations, QA judgments/results, structured human reviews, and the complete policy.
+Report identity binds the suite, processor version, optional baseline report, policy, metrics,
+gates, regressions, findings, and a content checksum. Canonical strict JSON is explicit caller
+output and is not silently persisted; suites may embed sensitive QA retrieval text and must be
+handled accordingly.
+
 ## Security boundary and limits
 
 Milestone 1 rejects missing paths, directories, symbolic-link inputs, empty/unsupported/malformed
@@ -460,6 +501,11 @@ retrieval results in-process and emits only exact source substrings separated by
 delimiter. Coverage is lexical evidence selection, not a truth or completeness score. Document
 instructions remain untrusted text even when they appear in an answer. Questions, retrieval
 results, and QA results are not silently retained or disclosed externally.
+
+Quality evaluation adds no parser, model, network request, or document execution path. It consumes
+already validated metric/result objects, records no reviewer identity or free-text review, and
+applies a 512 MiB CLI input ceiling. Quality metrics and gates describe measured fixtures only;
+they are not proof of general correctness, safety, truth, fairness, or production readiness.
 
 All extracted text remains untrusted document data. PageTrace does not execute embedded commands,
 scripts, URLs, or instruction-like text, and no extracted content should be treated as a system or
