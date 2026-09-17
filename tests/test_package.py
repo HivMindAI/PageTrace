@@ -5,6 +5,7 @@ import pagetrace
 import pagetrace.corpus
 import pagetrace.extraction
 import pagetrace.ocr
+import pagetrace.retrieval
 import pagetrace.structure
 
 
@@ -13,6 +14,7 @@ def test_package_imports() -> None:
     assert pagetrace.__name__ == "pagetrace"
     assert pagetrace.extraction.__name__ == "pagetrace.extraction"
     assert pagetrace.ocr.__name__ == "pagetrace.ocr"
+    assert pagetrace.retrieval.__name__ == "pagetrace.retrieval"
     assert pagetrace.structure.__name__ == "pagetrace.structure"
     assert pagetrace.corpus.__name__ == "pagetrace.corpus"
 

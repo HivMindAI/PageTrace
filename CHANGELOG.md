@@ -9,6 +9,10 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 
 ### Added
 
+- Milestone 5 deterministic Unicode-tokenized Okapi BM25 retrieval with stable ranking, exact
+  corpus/chunk/page/region provenance, query limits, canonical result identities, and checksums.
+- Canonical binary relevance datasets plus Precision@k, Recall@k, MRR, MAP, and nDCG evaluation,
+  Python APIs, `retrieve`/`evaluate-retrieval` CLI commands, tests, and clean-wheel smoke coverage.
 - Milestone 4 immutable schema-v1 corpus artifacts with deterministic page-bounded chunks, stable
   chunk identities, exact source-span/chunk character offsets, positioned evidence regions, and
   complete structured-artifact lineage.

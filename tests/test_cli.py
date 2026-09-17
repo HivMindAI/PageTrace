@@ -11,6 +11,15 @@ from pagetrace.corpus import CorpusLimitError, build_corpus_artifact
 from pagetrace.documents import ingest_document
 from pagetrace.extraction import ExtractionLimitError, extract_document_text
 from pagetrace.ocr import OcrEvaluationError
+from pagetrace.retrieval import (
+    RetrievalConfig,
+    RetrievalEvaluationError,
+    RetrievalJudgment,
+    RetrievalQueryError,
+    create_retrieval_dataset,
+    rank_corpus,
+    serialize_retrieval_dataset,
+)
 from pagetrace.structure import StructureProcessingError
 from tests.conftest import ImageFactory
 from tests.test_corpus_models import _source as corpus_source
@@ -394,3 +403,113 @@ def test_cli_corpus_failure_is_concise(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == "pagetrace: error: corpus limit reached\n"
+
+
+def test_cli_retrieve_plain_and_json_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    corpus = build_corpus_artifact(corpus_source((("alpha beta",), ("beta gamma",))))
+    result = rank_corpus(corpus, "beta", configuration=RetrievalConfig(top_k=1))
+    monkeypatch.setattr(pagetrace.cli, "retrieve", lambda *_args, **_kwargs: result)
+
+    arguments = [
+        "retrieve",
+        corpus.document_id,
+        corpus.artifact_id,
+        "beta",
+        "--top-k",
+        "1",
+        "--store",
+        str(tmp_path),
+    ]
+    assert main(arguments) == 0
+    output = capsys.readouterr().out
+    assert f"retrieval result id: {result.result_id}" in output
+    assert "hits: 1/2" in output
+    assert "rank 1:" in output
+
+    assert main([*arguments, "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["result_id"] == result.result_id
+    assert payload["hits"][0]["chunk_id"] == corpus.chunks[0].chunk_id
+
+
+def test_cli_evaluate_retrieval_from_canonical_dataset(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    corpus = build_corpus_artifact(corpus_source((("alpha beta",), ("beta gamma",))))
+    dataset = create_retrieval_dataset(
+        corpus.artifact_id,
+        (RetrievalJudgment("q1", "alpha", (corpus.chunks[0].chunk_id,)),),
+    )
+    dataset_path = tmp_path / "retrieval-dataset.json"
+    dataset_path.write_bytes(serialize_retrieval_dataset(dataset))
+    monkeypatch.setattr(pagetrace.cli, "load_corpus_artifact", lambda *_args, **_kwargs: corpus)
+
+    assert (
+        main(
+            [
+                "evaluate-retrieval",
+                corpus.document_id,
+                corpus.artifact_id,
+                str(dataset_path),
+                "--top-k",
+                "2",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["dataset_id"] == dataset.dataset_id
+    assert payload["mean_recall"] == 1.0
+    assert payload["mean_precision"] == 0.5
+
+
+def test_cli_retrieval_failures_are_concise(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise RetrievalQueryError("query has no terms")
+
+    monkeypatch.setattr(pagetrace.cli, "retrieve", fail)
+    assert (
+        main(
+            [
+                "retrieve",
+                f"sha256-{'1' * 64}",
+                f"corpus-sha256-{'2' * 64}",
+                "!!!",
+            ]
+        )
+        == 2
+    )
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == "pagetrace: error: query has no terms\n"
+
+
+@pytest.mark.parametrize("value", ["0", "1001", "not-an-integer"])
+def test_cli_retrieval_cutoff_is_bounded(value: str) -> None:
+    with pytest.raises(SystemExit) as error:
+        build_parser().parse_args(
+            [
+                "retrieve",
+                f"sha256-{'1' * 64}",
+                f"corpus-sha256-{'2' * 64}",
+                "query",
+                "--top-k",
+                value,
+            ]
+        )
+    assert error.value.code == 2
+
+
+def test_cli_retrieval_dataset_rejects_non_regular_input(tmp_path: Path) -> None:
+    with pytest.raises(RetrievalEvaluationError, match="regular"):
+        pagetrace.cli._read_retrieval_dataset(tmp_path)

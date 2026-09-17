@@ -42,6 +42,19 @@ from pagetrace.ocr import (
     serialize_ocr_artifact,
     serialize_ocr_evaluation,
 )
+from pagetrace.retrieval import (
+    RetrievalConfig,
+    RetrievalDataset,
+    RetrievalError,
+    RetrievalEvaluation,
+    RetrievalEvaluationError,
+    RetrievalResult,
+    deserialize_retrieval_dataset,
+    evaluate_retrieval,
+    retrieve,
+    serialize_retrieval_evaluation,
+    serialize_retrieval_result,
+)
 from pagetrace.structure import (
     StructuredDocumentArtifact,
     StructureError,
@@ -51,6 +64,7 @@ from pagetrace.structure import (
 )
 
 _MAX_EVALUATION_TEXT_BYTES = 20 * 1024 * 1024
+_MAX_RETRIEVAL_DATASET_BYTES = 20 * 1024 * 1024
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -168,7 +182,51 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_corpus_parser.add_argument(
         "--json", action="store_true", help="emit the canonical corpus artifact"
     )
+
+    retrieve_parser = subparsers.add_parser(
+        "retrieve", help="rank corpus chunks with the deterministic BM25 baseline"
+    )
+    retrieve_parser.add_argument("document_id", help="verified PageTrace document identifier")
+    retrieve_parser.add_argument("corpus_artifact_id", help="verified corpus artifact identifier")
+    retrieve_parser.add_argument("query", help="untrusted lexical query text")
+    retrieve_parser.add_argument(
+        "--top-k", type=_retrieval_top_k, default=10, help="result cutoff (1-1000)"
+    )
+    retrieve_parser.add_argument("--store", type=Path, default=Path(".pagetrace"))
+    retrieve_parser.add_argument(
+        "--json", action="store_true", help="emit the canonical retrieval result"
+    )
+
+    retrieval_evaluation_parser = subparsers.add_parser(
+        "evaluate-retrieval", help="evaluate BM25 against binary relevance judgments"
+    )
+    retrieval_evaluation_parser.add_argument(
+        "document_id", help="verified PageTrace document identifier"
+    )
+    retrieval_evaluation_parser.add_argument(
+        "corpus_artifact_id", help="verified corpus artifact identifier"
+    )
+    retrieval_evaluation_parser.add_argument(
+        "dataset", type=Path, help="canonical retrieval dataset JSON"
+    )
+    retrieval_evaluation_parser.add_argument(
+        "--top-k", type=_retrieval_top_k, default=10, help="metric cutoff (1-1000)"
+    )
+    retrieval_evaluation_parser.add_argument("--store", type=Path, default=Path(".pagetrace"))
+    retrieval_evaluation_parser.add_argument(
+        "--json", action="store_true", help="emit canonical retrieval evaluation JSON"
+    )
     return parser
+
+
+def _retrieval_top_k(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("top-k must be an integer from 1 to 1000") from exc
+    if not 1 <= parsed <= 1_000:
+        raise argparse.ArgumentTypeError("top-k must be an integer from 1 to 1000")
+    return parsed
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -240,14 +298,42 @@ def main(argv: Sequence[str] | None = None) -> int:
                 store=arguments.store,
             )
             _print_corpus_artifact(corpus_artifact, as_json=arguments.json)
-        else:
+        elif arguments.command == "inspect-corpus":
             corpus_artifact = load_corpus_artifact(
                 arguments.artifact_id,
                 document_id=arguments.document_id,
                 store=arguments.store,
             )
             _print_corpus_artifact(corpus_artifact, as_json=arguments.json)
-    except (DocumentError, ExtractionError, OcrError, StructureError, CorpusError) as exc:
+        elif arguments.command == "retrieve":
+            retrieval_result = retrieve(
+                arguments.document_id,
+                arguments.corpus_artifact_id,
+                arguments.query,
+                store=arguments.store,
+                configuration=RetrievalConfig(top_k=arguments.top_k),
+            )
+            _print_retrieval_result(retrieval_result, as_json=arguments.json)
+        else:
+            corpus_artifact = load_corpus_artifact(
+                arguments.corpus_artifact_id,
+                document_id=arguments.document_id,
+                store=arguments.store,
+            )
+            retrieval_evaluation = evaluate_retrieval(
+                corpus_artifact,
+                _read_retrieval_dataset(arguments.dataset),
+                configuration=RetrievalConfig(top_k=arguments.top_k),
+            )
+            _print_retrieval_evaluation(retrieval_evaluation, as_json=arguments.json)
+    except (
+        DocumentError,
+        ExtractionError,
+        OcrError,
+        StructureError,
+        CorpusError,
+        RetrievalError,
+    ) as exc:
         print(f"pagetrace: error: {exc}", file=sys.stderr)
         return 2
     return 0
@@ -358,6 +444,37 @@ def _print_corpus_artifact(artifact: CorpusArtifact, *, as_json: bool) -> None:
         )
 
 
+def _print_retrieval_result(result: RetrievalResult, *, as_json: bool) -> None:
+    if as_json:
+        sys.stdout.buffer.write(serialize_retrieval_result(result))
+        return
+    print(f"retrieval result id: {result.result_id}")
+    print(f"source corpus artifact id: {result.source_corpus_artifact_id}")
+    print(f"processor: {result.processor.name} {result.processor.version}")
+    print(f"query: {result.query}")
+    print(f"hits: {result.returned_hit_count}/{result.corpus_chunk_count}")
+    for hit in result.hits:
+        print(
+            f"rank {hit.rank}: score {hit.score:.12f}, page {hit.page_number}, "
+            f"chunk {hit.chunk_index} ({hit.chunk_id})"
+        )
+
+
+def _print_retrieval_evaluation(evaluation: RetrievalEvaluation, *, as_json: bool) -> None:
+    if as_json:
+        sys.stdout.buffer.write(serialize_retrieval_evaluation(evaluation))
+        return
+    print(f"retrieval evaluation id: {evaluation.evaluation_id}")
+    print(f"dataset id: {evaluation.dataset_id}")
+    print(f"cases: {evaluation.case_count}")
+    print(f"cutoff: {evaluation.configuration.top_k}")
+    print(f"MRR: {evaluation.mean_reciprocal_rank:.12f}")
+    print(f"precision: {evaluation.mean_precision:.12f}")
+    print(f"recall: {evaluation.mean_recall:.12f}")
+    print(f"MAP: {evaluation.mean_average_precision:.12f}")
+    print(f"nDCG: {evaluation.mean_ndcg:.12f}")
+
+
 def _read_evaluation_text(path: Path) -> str:
     try:
         metadata = path.lstat()
@@ -378,3 +495,22 @@ def _read_evaluation_text(path: Path) -> str:
         return data.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise OcrEvaluationError("OCR evaluation input must be valid UTF-8") from exc
+
+
+def _read_retrieval_dataset(path: Path) -> RetrievalDataset:
+    try:
+        metadata = path.lstat()
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+            raise RetrievalEvaluationError("retrieval dataset must be a regular non-symlink file")
+        if metadata.st_size > _MAX_RETRIEVAL_DATASET_BYTES:
+            raise RetrievalEvaluationError(
+                f"retrieval dataset exceeds {_MAX_RETRIEVAL_DATASET_BYTES} bytes"
+            )
+        data = path.read_bytes()
+    except RetrievalEvaluationError:
+        raise
+    except OSError as exc:
+        raise RetrievalEvaluationError("retrieval dataset could not be read") from exc
+    if len(data) != metadata.st_size:
+        raise RetrievalEvaluationError("retrieval dataset changed while it was read")
+    return deserialize_retrieval_dataset(data)

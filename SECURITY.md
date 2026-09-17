@@ -6,7 +6,8 @@ JPEG. Milestone 2A adds in-process embedded PDF text extraction and explicit OCR
 Milestone 2B adds bounded, routed PDFium rendering and RapidOCR inference. Milestone 3 adds
 pdfplumber layout/table parsing and deterministic OCR geometry replay. Milestone 4 adds bounded
 deterministic chunk construction and full structure-to-corpus reconstruction checks without
-introducing another parser or model. None of these stages provides complete document sandboxing.
+introducing another parser or model. Milestone 5 adds bounded in-process lexical BM25 retrieval and
+binary relevance evaluation. None of these stages provides complete document sandboxing.
 
 ## Implemented Milestone 1 protections
 
@@ -119,6 +120,24 @@ traceable regions, not semantic correctness or reading-order accuracy.
 Chunking does not make source text trustworthy or semantically correct. Tables remain available
 through the linked structured artifact and are not duplicated into speculative table text.
 
+## Implemented Milestone 5 protections
+
+- Retrieval accepts only a corpus artifact whose complete document-to-corpus provenance is
+  successfully reverified during loading.
+- The tokenizer and BM25 implementation are local, deterministic, versioned, and dependency-free.
+  Processor identity records the tokenizer version and Python Unicode-data version.
+- Query limits cap accepted characters and produced tokens. Whitespace-only and term-free queries
+  fail explicitly instead of producing misleading rankings.
+- Ranked hits retain exact corpus/chunk fingerprints, page and region coordinates, source text,
+  matched lexical terms, stable rank order, and per-result content checksums.
+- Binary relevance datasets bind judgments to one corpus. Evaluation rejects relevant chunk IDs
+  outside that corpus and reports explicit fixed-cutoff Precision, Recall, MRR, MAP, and nDCG.
+- Query results, datasets, and evaluations have strict canonical schema-v1 JSON, but PageTrace does
+  not silently persist query text or metrics to artifact storage.
+
+Retrieval scores measure lexical overlap, not truth, semantic equivalence, or answer support.
+Queries and matched document text remain untrusted data and are never executed.
+
 ## Security principles
 
 - Treat every document and all extracted content as untrusted data.
@@ -131,7 +150,7 @@ through the linked structured artifact and are not duplicated into speculative t
 
 ## Residual risks and future security work
 
-Milestones 1 through 4 are in-process processing boundaries, not operating-system sandboxes.
+Milestones 1 through 5 are in-process processing boundaries, not operating-system sandboxes.
 Residual risks include vulnerabilities or pathological CPU/memory behavior in pypdf and
 pdfplumber text/content-stream/layout parsing, Pillow, Python, or native image codecs; very large
 decompressed text streams; deeply nested PDF object graphs; filesystem exhaustion; storage-root
@@ -145,7 +164,8 @@ or ONNX Runtime inputs from consuming CPU or memory before returning. OCR line a
 apply after inference. Structure span/table/cell limits apply after parser or inference work has
 returned data. PageTrace does not claim CPU, memory, time, subprocess, parser, or inference
 isolation. Corpus limits bound accepted output but construction and canonical serialization may
-still consume memory proportional to the verified structured input.
+still consume memory proportional to the verified structured input. BM25 currently tokenizes the
+complete bounded corpus for each query without persistent indexing or hard time/memory isolation.
 
 Future threat modeling and milestones will cover at least:
 

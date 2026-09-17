@@ -56,10 +56,16 @@ content fingerprint, processor, configuration, limits, canonical checksums, and 
 Readback regenerates the complete corpus from the verified structure source. This implementation
 remains subject to milestone review and acceptance.
 
-## Milestone 5 — Retrieval Baselines & Evaluation
+## Milestone 5 — Retrieval Baselines & Evaluation (implementation pending acceptance)
 
 Build transparent retrieval baselines, evaluation datasets, and measurable relevance metrics
 before introducing more complex retrieval techniques.
+
+The current implementation provides a versioned NFKC/case-folded Unicode tokenizer and deterministic
+Okapi BM25 ranking with stable tie-breaking and exact corpus, chunk, page, region, processor, and
+configuration provenance. Canonical binary-relevance datasets and evaluations report Precision@k,
+Recall@k, MRR, MAP, and nDCG. Queries and evaluations are serializable but are not silently retained.
+This implementation remains subject to milestone review and acceptance.
 
 ## Milestone 6 — Evidence-grounded QA
 

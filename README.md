@@ -17,8 +17,9 @@ PageTrace is guided by four ideas:
 ## Current status
 
 PageTrace is **pre-alpha**. Milestones 0, 1, and 2A are complete. Milestone 2B routed OCR,
-Milestone 3 structured representation, and Milestone 4 provenance-aware corpus construction are
-implemented on a development branch and pending acceptance. The current package can:
+Milestone 3 structured representation, Milestone 4 provenance-aware corpus construction, and
+Milestone 5 retrieval baselines/evaluation are implemented on a development branch and pending
+acceptance. The current package can:
 
 - stage untrusted local PDF, PNG, and JPEG files under explicit byte/page/pixel limits;
 - identify supported media from content signatures and confirm it with pypdf or Pillow;
@@ -41,14 +42,16 @@ implemented on a development branch and pending acceptance. The current package 
 - retain exact source-span, character-offset, page-region, coordinate-unit, and processor lineage;
   and
 - persist immutable corpus artifacts whose chunks can be reconstructed and reverified from the
-  exact structured source.
+  exact structured source;
+- rank verified corpus chunks with a transparent, versioned Unicode BM25 baseline; and
+- evaluate binary relevance judgments with Precision@k, Recall@k, MRR, MAP, and nDCG.
 
 An OCR-candidate status remains routing information rather than proof that OCR is necessary or
 accurate. OCR output is untrusted derived data with measured confidence, not verified truth.
-PageTrace does not yet index content, perform retrieval/RAG, use language/vision models, or answer
-questions. Corpus chunks currently cover positioned text spans; tables remain traceable through the
-linked structure artifact rather than being duplicated as speculative table text. Table extraction
-is limited to deterministic line-based PDF detection.
+PageTrace does not yet build persistent or vector indexes, perform answer generation/RAG, use
+language/vision models, or answer questions. Corpus chunks currently cover positioned text spans;
+tables remain traceable through the linked structure artifact rather than being duplicated as
+speculative table text. Table extraction is limited to deterministic line-based PDF detection.
 
 ## Planned conceptual pipeline
 
@@ -65,7 +68,7 @@ positioned text and line-based PDF tables (Milestone 3 pending acceptance)
         |
 provenance-aware page-bounded chunks (Milestone 4 pending acceptance)
         |
-retrieval and evidence evaluation (planned)
+transparent BM25 retrieval and relevance metrics (Milestone 5 pending acceptance)
         |
 evidence-grounded answers and product experiences (planned)
 ```
@@ -98,6 +101,12 @@ from pagetrace.corpus import build_corpus, load_corpus_artifact
 from pagetrace.documents import ingest_document, load_document
 from pagetrace.extraction import extract_document_text, load_text_extraction
 from pagetrace.ocr import evaluate_ocr, load_ocr_artifact, ocr_document
+from pagetrace.retrieval import (
+    RetrievalJudgment,
+    create_retrieval_dataset,
+    evaluate_retrieval,
+    retrieve,
+)
 from pagetrace.structure import load_structured_document, structure_document
 
 manifest = ingest_document(Path("annual-report.pdf"), store=Path(".pagetrace"))
@@ -157,6 +166,26 @@ assert (
     )
     == corpus
 )
+
+results = retrieve(
+    manifest.document_id,
+    corpus.artifact_id,
+    "revenue growth",
+    store=Path(".pagetrace"),
+)
+
+dataset = create_retrieval_dataset(
+    corpus.artifact_id,
+    (
+        RetrievalJudgment(
+            query_id="revenue-growth",
+            query="revenue growth",
+            relevant_chunk_ids=(corpus.chunks[0].chunk_id,),
+        ),
+    ),
+)
+metrics = evaluate_retrieval(corpus, dataset)
+print(results.returned_hit_count, metrics.mean_recall)
 ```
 
 Expected document failures derive from `DocumentError`. More specific public errors distinguish
@@ -239,6 +268,15 @@ offsets, evidence source, and bounding box. Defaults allow at most 10,000 chunks
 chunks per document, 10,000 fragments per chunk, 1,000,000 fragments per document, and 50,000,000
 accepted chunk characters per document.
 
+Milestone 5 uses a fixed NFKC/case-folded Unicode word tokenizer and Okapi BM25 with explicit
+defaults `k1=1.2`, `b=0.75`, and `top_k=10`. Positive-scoring chunks are ordered by score and then
+stable corpus order. Results preserve the exact corpus identity/content fingerprint plus chunk,
+page, coordinate, bounding-region, text, matched-term, and processor/tokenizer provenance. Queries
+are limited to 10,000 characters and 1,000 tokens. Binary relevance evaluation reports
+Precision@k, Recall@k, reciprocal rank, average precision, and nDCG per case and as deterministic
+means. Query results and evaluations are returned or serialized explicitly; they are not silently
+persisted.
+
 ## CLI
 
 ```bash
@@ -261,6 +299,11 @@ pagetrace build-corpus sha256-<64-lowercase-hex-characters> \
   structure-sha256-<64-lowercase-hex-characters> --store .pagetrace
 pagetrace inspect-corpus sha256-<64-lowercase-hex-characters> \
   corpus-sha256-<64-lowercase-hex-characters> --store .pagetrace --json
+pagetrace retrieve sha256-<64-lowercase-hex-characters> \
+  corpus-sha256-<64-lowercase-hex-characters> "revenue growth" --store .pagetrace --json
+pagetrace evaluate-retrieval sha256-<64-lowercase-hex-characters> \
+  corpus-sha256-<64-lowercase-hex-characters> retrieval-dataset.json \
+  --top-k 10 --store .pagetrace --json
 
 # The module entry point is equivalent.
 python -m pagetrace ingest annual-report.pdf --store .pagetrace --json
@@ -268,8 +311,8 @@ python -m pagetrace ingest annual-report.pdf --store .pagetrace --json
 
 Plain output reports document or artifact identity, provenance, page counts, and per-page routing.
 `--json` emits the relevant canonical manifest, artifact, or metric object. Expected document,
-extraction, OCR, evaluation, structure, and corpus errors are concise, have a non-zero exit status,
-and do not display a traceback.
+extraction, OCR, structure, corpus, and retrieval/evaluation errors are concise, have a non-zero
+exit status, and do not display a traceback.
 
 ## Artifact and identity design
 
@@ -330,6 +373,13 @@ resource limits. Each chunk has its own stable corpus-scoped identifier and cont
 exact page, region, coordinate, span, and character-slice provenance. Readback reloads the structured source,
 regenerates the expected corpus deterministically, and rejects any contradiction.
 
+Retrieval results and evaluation datasets use schema version `1`. Result identity captures the
+exact corpus identity/content fingerprint, query, BM25 configuration, processor/tokenizer versions,
+and Unicode data version. Canonical results checksum the complete ranked hit list. Evaluation
+dataset identity captures ordered queries and binary relevant chunk IDs; evaluation identity binds
+that dataset to the exact corpus and retrieval configuration. These objects are serializable but
+are not placed in artifact storage automatically because queries may contain sensitive data.
+
 ## Security boundary and limits
 
 Milestone 1 rejects missing paths, directories, symbolic-link inputs, empty/unsupported/malformed
@@ -360,6 +410,11 @@ Corpus construction introduces no new parser or model. Its typed chunk, fragment
 limits are enforced before persistence. Canonical corpus files are additionally capped at 512 MiB.
 Construction still occurs in-process and may consume memory proportional to accepted structured
 text and canonical output.
+
+BM25 retrieval tokenizes all accepted chunks in-process for each query; there is no persistent
+index, cache, subprocess, or hard CPU/memory/time isolation. Query character/token limits bound
+accepted input, while the existing corpus limits bound scanned content. Queries remain untrusted
+data and are never executed or sent to an external service.
 
 All extracted text remains untrusted document data. PageTrace does not execute embedded commands,
 scripts, URLs, or instruction-like text, and no extracted content should be treated as a system or

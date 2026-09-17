@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "pagetrace"
 version = "0.1.0.dev0"
-description = "Deterministic ingestion, OCR, document structure, and provenance-aware chunking."
+description = "Deterministic document ingestion, structure, provenance-aware chunking, and retrieval."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
