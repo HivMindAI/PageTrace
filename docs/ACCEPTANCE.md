@@ -11,7 +11,9 @@ limitations into supported features or make unmeasured accuracy, security, or de
 - Reviewed baseline: `30d150341e0f10245791ae9e626c6ccf9d10b3e5`
 - Scope: Milestones 2B through 11; Milestones 0, 1, and 2A were already complete
 - Decision: accepted for the PageTrace v1.0 portfolio release candidate
-- Release state: accepted but not yet tagged or published
+- Release state: the `v1.0.0` candidate tag was blocked by frontend dependency audit findings;
+  no release was published, and the corrected `v1.0.1` candidate has passed local validation and
+  is pending its immutable tagged workflow
 
 ## Accepted evidence
 
@@ -30,16 +32,18 @@ limitations into supported features or make unmeasured accuracy, security, or de
 
 ## Validation reviewed
 
-The accepted baseline completed the following release-candidate checks:
+The accepted feature baseline and corrective 1.0.1 candidate completed the following
+release-candidate checks:
 
 - Ruff lint and formatting checks across all 101 Python source and test files;
 - strict mypy validation for Python 3.12 across all 101 Python source and test files;
 - 567 passing Python tests, 3 skipped integration cases, and 90.86% branch-aware coverage;
-- npm dependency audit with no reported vulnerabilities, ESLint, 4 passing frontend tests, and a
-  successful production build whose packaged assets remained current;
-- successful `pagetrace-1.0.0` wheel and source-archive builds with strict Twine validation; and
+- npm dependency audit with no reported vulnerabilities after upgrading to Vite 8.3.0 and Vitest
+  5.0.1, ESLint, 4 passing frontend tests, and a successful production build;
+- an isolated Python dependency audit with no known third-party vulnerabilities;
+- successful `pagetrace-1.0.1` wheel and source-archive builds with strict Twine validation; and
 - two clean-wheel portfolio executions with the same canonical manifest SHA-256
-  `8f0ca76c46b9363054dee7d766fbb719c4361ea8eb89ce4cf7ad175bf6f89ec5`, an exact page-one
+  `4ca29cb12b176b3da83c3d7732d1bc6f787c0b66897f23cb0b5dabebe777271f`, an exact page-one
   citation, explicit no-hit abstention, and passing quality gates.
 
 ## Retained limitations

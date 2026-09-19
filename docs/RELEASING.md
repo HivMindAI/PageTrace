@@ -42,8 +42,8 @@ git diff --check
 Create and push an exact version tag, preferably signed:
 
 ```bash
-git tag -s v1.0.0 -m "PageTrace v1.0.0"
-git push origin v1.0.0
+git tag -s v1.0.1 -m "PageTrace v1.0.1"
+git push origin v1.0.1
 ```
 
 The `Release Candidate` workflow rejects a tag that does not equal `v` plus the package version.

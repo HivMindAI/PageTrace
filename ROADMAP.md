@@ -146,7 +146,7 @@ Advanced multimodal, vision-language-model, and chart intelligence is optional b
 should be introduced only when evaluated user needs and baseline limitations justify its added
 complexity, cost, and risk.
 
-The current implementation identifies itself as version 1.0.0 and includes an atomic
+The current implementation identifies itself as version 1.0.1 and includes an atomic
 `portfolio-demo` workflow. It generates a deterministic two-page PDF, executes the verified
 document-to-evidence pipeline, demonstrates an exact cited answer and explicit no-hit abstention,
 and emits canonical retrieval and quality evaluations plus a digest-indexed manifest with explicit

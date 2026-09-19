@@ -19,7 +19,7 @@ python -m venv .venv
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev,ocr,structure]"
 
-# Frontend toolchain (Node.js 22 or newer)
+# Frontend toolchain (Node.js 22.12 or a supported newer release)
 cd web
 npm ci
 cd ..

@@ -7,6 +7,15 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-19
+
+### Changed
+
+- Upgraded the frontend verification toolchain to Vite 8.3 and Vitest 5.0.1 after the `v1.0.0`
+  candidate was blocked by newly reported npm audit findings in their older dependency chains.
+- Synchronized Python and web package metadata at version 1.0.1. This patch changes release
+  tooling dependencies and metadata without expanding PageTrace's accepted functional scope.
+
 ## [1.0.0] - 2026-09-19
 
 ### Added
