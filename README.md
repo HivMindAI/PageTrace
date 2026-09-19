@@ -16,13 +16,10 @@ PageTrace is guided by four ideas:
 
 ## Current status
 
-PageTrace is a **v1.0 portfolio release candidate**. Milestones 0, 1, and 2A are complete. Milestone 2B routed OCR,
-Milestone 3 structured representation, Milestone 4 provenance-aware corpus construction,
-Milestone 5 retrieval baselines/evaluation, Milestone 6 evidence-grounded QA, Milestone 7
-consolidated quality evaluation, Milestone 8 product backend, and Milestone 9 evidence-first web
-product, Milestone 10 hardening, and the Milestone 11 reproducible portfolio are implemented and
-pending acceptance. Version 1.0 describes the portfolio/API milestone, not a claim that the local
-service is suitable for remote or multi-user production deployment. The current package can:
+PageTrace is a **v1.0 portfolio release candidate**. Milestones 0 through 11 are implemented and
+accepted within their documented scope. Version 1.0 describes the portfolio/API milestone, not a
+claim that the local service is suitable for remote or multi-user production deployment. The
+current package can:
 
 - stage untrusted local PDF, PNG, and JPEG files under explicit byte/page/pixel limits;
 - identify supported media from content signatures and confirm it with pypdf or Pillow;
@@ -72,7 +69,7 @@ positioned text spans; tables remain traceable through the linked structure arti
 being duplicated as speculative table text. Table extraction is limited to deterministic
 line-based PDF detection.
 
-## Planned conceptual pipeline
+## Implemented pipeline
 
 ```text
 untrusted documents
@@ -81,28 +78,29 @@ secure deterministic ingestion (Milestone 1 complete)
         |
 embedded PDF text + explicit OCR routing (Milestone 2A complete)
         |
-real OCR engine and measured OCR evaluation (Milestone 2B pending acceptance)
+real OCR engine and measured OCR evaluation (Milestone 2B complete)
         |
-positioned text and line-based PDF tables (Milestone 3 pending acceptance)
+positioned text and line-based PDF tables (Milestone 3 complete)
         |
-provenance-aware page-bounded chunks (Milestone 4 pending acceptance)
+provenance-aware page-bounded chunks (Milestone 4 complete)
         |
-transparent BM25 retrieval and relevance metrics (Milestone 5 pending acceptance)
+transparent BM25 retrieval and relevance metrics (Milestone 5 complete)
         |
-extractive evidence-grounded QA with explicit abstention (Milestone 6 pending acceptance)
+extractive evidence-grounded QA with explicit abstention (Milestone 6 complete)
         |
-cross-stage metrics, human rubrics, gates, and regressions (Milestone 7 pending acceptance)
+cross-stage metrics, human rubrics, gates, and regressions (Milestone 7 complete)
         |
-durable authenticated product backend (Milestone 8 pending acceptance)
+durable authenticated product backend (Milestone 8 complete)
         |
-evidence-first web product (Milestone 9 pending acceptance)
+evidence-first web product (Milestone 9 complete)
         |
-local security and operational hardening (Milestone 10 pending acceptance)
+local security and operational hardening (Milestone 10 complete)
         |
-reproducible evidence-backed portfolio (Milestone 11 pending acceptance)
+reproducible evidence-backed portfolio (Milestone 11 complete)
 ```
 
-See [ROADMAP.md](ROADMAP.md) for milestone scope boundaries.
+See [ROADMAP.md](ROADMAP.md) for milestone scope boundaries and
+[docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) for the v1.0 acceptance record.
 
 ## Development setup
 

@@ -3,6 +3,10 @@
 The roadmap grows PageTrace in evidence-driven increments. Milestone boundaries are plans, not
 claims of released functionality.
 
+Milestones 0 through 11 have completed implementation and acceptance review. The scoped evidence
+and retained limitations for Milestones 2B through 11 are recorded in
+[`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md). Release publication remains a separate, explicit step.
+
 ## Milestone 0 — Project Foundation (complete)
 
 Establish the typed Python package, build metadata, tests, coverage policy, quality tooling,
@@ -13,8 +17,7 @@ continuous integration, and project policies required for responsible developmen
 Define a bounded, reproducible ingestion boundary for untrusted documents, including validation,
 stable identity, safe paths, limits, and auditable page manifests.
 
-The accepted implementation is merged on `main`. It remains unreleased while later development
-milestones continue.
+The accepted implementation is merged on `main`.
 
 ## Milestone 2A — Deterministic Text Extraction & OCR Routing (complete)
 
@@ -22,7 +25,7 @@ Extract embedded PDF text with deterministic provenance and immutable derived ar
 pages with no usable embedded text, sparse embedded text, and image documents explicitly for
 future OCR consideration without fabricating OCR output.
 
-## Milestone 2B — OCR Engine & Evaluation (implementation pending acceptance)
+## Milestone 2B — OCR Engine & Evaluation (complete)
 
 Select and integrate a real OCR engine, render only routed pages, and establish representative OCR
 fixtures and measured evaluation. Engine choice, model downloads, image preprocessing, language
@@ -31,9 +34,9 @@ coverage, and OCR accuracy claims belong here rather than Milestone 2A.
 The current implementation uses RapidOCR with bundled PP-OCR models and the CPU ONNX Runtime
 backend. PDFium renders only pages selected by the immutable Milestone 2A routing artifact. Exact
 text, character-error-rate, and word-error-rate evaluation is available without hidden
-normalization. This implementation remains subject to milestone review and acceptance.
+normalization. The implementation is accepted within these stated boundaries.
 
-## Milestone 3 — Structured Document Representation (implementation pending acceptance)
+## Milestone 3 — Structured Document Representation (complete)
 
 Represent pages, text spans, layout elements, tables, and their source coordinates without losing
 the provenance needed for later evidence display.
@@ -41,10 +44,10 @@ the provenance needed for later evidence display.
 The current implementation emits explicit top-left PDF-point or image-pixel coordinates for
 embedded words and replay-verified OCR lines, plus line-delimited PDF table grids and positioned
 cells. Immutable schema-v1 artifacts retain exact document, text-routing, OCR, processor, backend,
-configuration, and content provenance. This implementation remains subject to milestone review
-and acceptance.
+configuration, and content provenance. The implementation is accepted within these stated
+boundaries.
 
-## Milestone 4 — Provenance-aware Chunking & Corpus Model (implementation pending acceptance)
+## Milestone 4 — Provenance-aware Chunking & Corpus Model (complete)
 
 Create chunks and corpus records that retain document, page, region, transformation, and version
 lineage while supporting repeatable reconstruction.
@@ -53,10 +56,10 @@ The current implementation builds deterministic page-bounded chunks from positio
 splits oversized spans into exact character slices, and records source/chunk offsets and bounding
 regions for every fragment. Immutable schema-v1 corpus artifacts retain exact structure identity,
 content fingerprint, processor, configuration, limits, canonical checksums, and atomic storage.
-Readback regenerates the complete corpus from the verified structure source. This implementation
-remains subject to milestone review and acceptance.
+Readback regenerates the complete corpus from the verified structure source. The implementation is
+accepted within these stated boundaries.
 
-## Milestone 5 — Retrieval Baselines & Evaluation (implementation pending acceptance)
+## Milestone 5 — Retrieval Baselines & Evaluation (complete)
 
 Build transparent retrieval baselines, evaluation datasets, and measurable relevance metrics
 before introducing more complex retrieval techniques.
@@ -65,9 +68,9 @@ The current implementation provides a versioned NFKC/case-folded Unicode tokeniz
 Okapi BM25 ranking with stable tie-breaking and exact corpus, chunk, page, region, processor, and
 configuration provenance. Canonical binary-relevance datasets and evaluations report Precision@k,
 Recall@k, MRR, MAP, and nDCG. Queries and evaluations are serializable but are not silently retained.
-This implementation remains subject to milestone review and acceptance.
+The implementation is accepted within these stated boundaries.
 
-## Milestone 6 — Evidence-grounded QA (implementation pending acceptance)
+## Milestone 6 — Evidence-grounded QA (complete)
 
 Generate answers only from retrieved evidence, preserve source attribution, and define abstention
 and unsupported-claim behavior.
@@ -75,10 +78,10 @@ and unsupported-claim behavior.
 The current implementation provides a deterministic extractive baseline whose answer text is
 restricted to exact character slices of BM25 hits. Canonical schema-v1 results embed the complete
 retrieval result, attach chunk/rank/offset citations, enforce configurable query-term coverage and
-output bounds, and explicitly abstain for no hits, weak evidence, or unusable answer limits. This
-implementation remains subject to milestone review and acceptance.
+output bounds, and explicitly abstain for no hits, weak evidence, or unusable answer limits. The
+implementation is accepted within these stated boundaries.
 
-## Milestone 7 — Evaluation & Quality System (implementation pending acceptance)
+## Milestone 7 — Evaluation & Quality System (complete)
 
 Consolidate automated and human evaluation for extraction, retrieval, answers, provenance, safety,
 regressions, and cost. Evaluation is cross-cutting: fixtures and metrics begin as soon as behavior
@@ -89,9 +92,9 @@ text error metrics, retrieval evaluations, expected QA outcomes, citation releva
 human rubrics, safety findings, and deterministic resource counters. Explicit static gates,
 minimum sample floors, directional baseline-regression rules, and passed/failed/incomplete/
 observational outcomes support local and CI use without claiming broader quality than the supplied
-fixtures establish. This implementation remains subject to milestone review and acceptance.
+fixtures establish. The implementation is accepted within these stated boundaries.
 
-## Milestone 8 — Product Backend (implementation pending acceptance)
+## Milestone 8 — Product Backend (complete)
 
 Expose stable application workflows, persistence, background execution, observability, and
 operational controls behind a deliberately designed backend boundary.
@@ -101,9 +104,9 @@ requests, explicit job states and events, atomic claiming, retries, cancellation
 recovery, health/readiness checks, and persistent counters. Injected handlers expose ingestion,
 evidence-grounded QA, and quality evaluation behind an authenticated loopback-only JSON API and a
 separate operator CLI. This is a single-host application boundary, not a production deployment or
-process sandbox, and remains subject to milestone review and acceptance.
+process sandbox. The implementation is accepted within these stated boundaries.
 
-## Milestone 9 — Evidence-first Web Product (implementation pending acceptance)
+## Milestone 9 — Evidence-first Web Product (complete)
 
 Build a web experience centered on inspecting sources, navigating evidence, understanding system
 uncertainty, and correcting failures.
@@ -115,10 +118,10 @@ page geometry, exact citation slices, retrieval candidates, lexical coverage, ab
 quality gates, regressions, findings, and aggregate system counters. Authentication is memory-only
 in the browser. Static assets are served from loopback with strict path handling, a restrictive
 content security policy, anti-framing and MIME-sniffing protections, and immutable caching only for
-fingerprinted assets. This remains a single-host inspection product, not a multi-user deployment,
-and is subject to milestone review and acceptance.
+fingerprinted assets. This remains a single-host inspection product, not a multi-user deployment.
+The implementation is accepted within these stated boundaries.
 
-## Milestone 10 — Production & Security Hardening (implementation pending acceptance)
+## Milestone 10 — Production & Security Hardening (complete)
 
 Harden isolation, quotas, privacy, dependency and supply-chain controls, incident readiness,
 deployment, and ongoing adversarial testing.
@@ -131,10 +134,10 @@ Deployment and incident-response runbooks define the supported loopback topology
 backup/restore, monitoring, containment, evidence preservation, recovery, and complete privacy
 deletion responsibilities. Adversarial tests cover authority confusion, retention capacity,
 cutoff/terminal-state preservation, and destructive-operation validation. This does not add hard
-parser/workflow CPU or memory isolation, TLS, remote access, or multi-user authorization and
-remains subject to milestone review and acceptance.
+parser/workflow CPU or memory isolation, TLS, remote access, or multi-user authorization. The
+implementation is accepted within these stated boundaries.
 
-## Milestone 11 — Portfolio v1.0 (implementation pending acceptance)
+## Milestone 11 — Portfolio v1.0 (complete)
 
 Deliver a documented, reproducible, evaluated v1.0 portfolio release with clearly stated limits
 and demonstrations grounded in real evidence.
@@ -150,5 +153,5 @@ and emits canonical retrieval and quality evaluations plus a digest-indexed mani
 limitations. A constrained reference environment and tag-only release workflow reproduce the
 manifest twice, run the full validation matrix, build distributions, and retain a checksummed
 candidate bundle for manual review. The synthetic fixture proves reproducibility and traceability,
-not general document accuracy or remote-production readiness, and the milestone remains subject to
-review and acceptance.
+not general document accuracy or remote-production readiness. The implementation is accepted
+within these stated boundaries.

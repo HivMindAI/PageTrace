@@ -10,9 +10,11 @@ release; the tag workflow produces a reviewable, checksummed artifact bundle fir
    `web/package-lock.json`.
 2. Move completed changelog entries under the dated version heading and leave `Unreleased` ready
    for later work.
-3. Review direct dependency constraints and release notes. Update
+3. Confirm [`ACCEPTANCE.md`](ACCEPTANCE.md) covers every milestone included in the release and does
+   not waive any documented limitation.
+4. Review direct dependency constraints and release notes. Update
    `requirements/portfolio-constraints.txt` only after reproducing and reviewing changed evidence.
-4. Run the complete local validation matrix:
+5. Run the complete local validation matrix:
 
 ```bash
 ruff check .
@@ -31,9 +33,9 @@ python -m twine check --strict dist/*
 git diff --check
 ```
 
-5. Compare the two portfolio manifests byte for byte, inspect their exact citations and limitations,
+6. Compare the two portfolio manifests byte for byte, inspect their exact citations and limitations,
    and remove the local output directories after review.
-6. Confirm the commit is on `main`, CI is green, and the working tree is clean.
+7. Confirm the commit is on `main`, CI is green, and the working tree is clean.
 
 ## Build the tagged candidate
 

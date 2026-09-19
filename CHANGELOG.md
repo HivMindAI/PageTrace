@@ -11,6 +11,8 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 
 ### Added
 
+- A formal acceptance record mapping Milestones 2B through 11 to their implementation commits,
+  validation evidence, and retained scope boundaries.
 - Milestone 11 atomic `portfolio-demo` workflow with a deterministic two-page PDF, complete
   document-to-evidence processing, exact cited answer, explicit no-hit abstention, canonical
   retrieval/quality outputs, file digests, and machine-readable claim limitations.
