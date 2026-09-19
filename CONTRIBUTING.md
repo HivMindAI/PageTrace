@@ -37,6 +37,7 @@ ruff check .
 ruff format --check .
 mypy src tests
 pytest
+pip-audit --local --skip-editable
 python -m build
 python -m twine check --strict dist/*
 git diff --check
@@ -58,6 +59,19 @@ that demonstrate the intended result and meaningful failure cases.
 Frontend changes must keep the TypeScript client strict, render backend/document values as text,
 avoid persistent token storage, and commit the production build under `src/pagetrace/web/dist` so
 the Python wheel remains directly runnable. `npm run build` must leave those packaged assets clean.
+
+## Backend and security-hardening changes
+
+Keep the built-in HTTP service loopback-only. Changes must not weaken exact Host/Origin checks,
+bounded request and connection handling, bearer authentication, no-store responses, or safe static
+file routing. New retained data needs an explicit size/count bound, documented privacy impact, and
+a safe deletion path. Destructive maintenance commands must default to preview, require an explicit
+confirmation, preserve active work, operate in bounded batches, and have focused tests.
+
+Review automated dependency updates as code changes: inspect release notes and provenance, retain
+supported-version bounds, run the complete suite, and do not merge solely because an audit is
+green. A dependency audit covers known package advisories; it does not prove a package, native
+library, build script, or model artifact is trustworthy.
 
 ## Clean-wheel smoke test
 

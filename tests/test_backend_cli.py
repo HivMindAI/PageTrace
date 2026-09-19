@@ -7,7 +7,7 @@ from typing import cast
 import pytest
 
 import pagetrace.backend.cli
-from pagetrace.backend import BackendService
+from pagetrace.backend import BackendService, SqliteJobStore, WorkflowName
 from pagetrace.backend.cli import build_parser, main
 
 
@@ -63,6 +63,72 @@ def test_backend_cli_parser_validation() -> None:
         build_parser().parse_args(["worker", "--poll-interval", "0"])
     with pytest.raises(SystemExit, match="2"):
         build_parser().parse_args(["serve", "--port", "70000"])
+    invalid = (
+        ["--max-retained-jobs", "0", "init"],
+        ["purge", "--limit", "0", "--older-than-hours", "1"],
+        ["purge", "--older-than-hours", "nan"],
+        ["purge", "--finished-before", "2026-01-01"],
+        ["serve", "--connection-timeout", "0"],
+    )
+    for arguments in invalid:
+        with pytest.raises(SystemExit, match="2"):
+            build_parser().parse_args(arguments)
+
+
+def test_backend_cli_purge_preview_and_confirmation(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    arguments = _base(tmp_path)
+    assert main([*arguments, "init"]) == 0
+    capsys.readouterr()
+
+    service = pagetrace.backend.cli._service(build_parser().parse_args([*arguments, "init"]))
+    service.initialize()
+    job, _ = service.store.submit(
+        WorkflowName.EVALUATE_QUALITY,
+        {},
+        idempotency_key="purge-me",
+    )
+    service.store.request_cancel(job.job_id)
+
+    cutoff = "2999-01-01T00:00:00Z"
+    assert main([*arguments, "purge", "--finished-before", cutoff]) == 0
+    assert "Purge preview: 1 terminal job(s)" in capsys.readouterr().out
+    assert service.store.get(job.job_id).status.value == "cancelled"
+
+    assert main([*arguments, "purge", "--finished-before", cutoff, "--confirm"]) == 0
+    assert "Purged 1 terminal job(s)" in capsys.readouterr().out
+
+    assert main([*arguments, "purge", "--older-than-hours", "1"]) == 0
+    assert "Purge preview: 0 terminal job(s)" in capsys.readouterr().out
+
+
+def test_backend_cli_purge_does_not_prepare_workflow_roots(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    database = tmp_path / "standalone.sqlite3"
+    SqliteJobStore(database).initialize()
+    artifact_store = tmp_path / "must-not-be-created"
+    missing_input = tmp_path / "missing-input"
+
+    assert (
+        main(
+            [
+                "--database",
+                str(database),
+                "--store",
+                str(artifact_store),
+                "--input-root",
+                str(missing_input),
+                "purge",
+                "--older-than-hours",
+                "1",
+            ]
+        )
+        == 0
+    )
+    assert "Purge preview: 0 terminal job(s)" in capsys.readouterr().out
+    assert not artifact_store.exists()
 
 
 def test_backend_cli_serve_lifecycle(

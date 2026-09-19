@@ -11,8 +11,10 @@ binary relevance evaluation. Milestone 6 adds local deterministic extractive QA 
 evidence enforcement and explicit abstention. Milestone 7 adds bounded local aggregation of
 validated evaluation objects, structured human rubrics, quality gates, and regression checks.
 Milestone 8 adds a bounded durable local job queue and authenticated loopback HTTP boundary.
-Milestone 9 adds a packaged same-origin evidence inspection interface. None of these stages
-provides complete document sandboxing or a hardened multi-tenant service.
+Milestone 9 adds a packaged same-origin evidence inspection interface. Milestone 10 adds HTTP
+authority/timeout hardening, retained-data quotas and bounded deletion, dependency
+maintenance/auditing, and deployment/incident runbooks. None of these stages provides complete
+document sandboxing or a hardened multi-tenant service.
 
 ## Implemented Milestone 1 protections
 
@@ -244,9 +246,42 @@ schema does not provide distributed worker leases or heartbeats.
 The frontend is not an authorization boundary. Any process or person holding the backend token can
 read every retained job result exposed by that backend, and browser extensions, local malware, or a
 compromised host may observe the token and displayed evidence. The built-in server still lacks TLS,
-accounts, per-user authorization, rate limits, CSRF tokens, remote deployment hardening, and data
-retention controls. Operators must keep it on loopback and protect the host, token, SQLite database,
+accounts, per-user authorization, request-rate limits, CSRF tokens, and remote deployment
+hardening. Operators must keep it on loopback and protect the host, token, SQLite database,
 artifact store, browser profile, and screen contents.
+
+## Implemented Milestone 10 protections
+
+- Every HTTP request requires exactly one Host header naming `127.0.0.1`, `::1`, or `localhost`
+  on the actual listening port. An optional Origin must be one exact HTTP loopback origin on that
+  port; duplicate, cross-origin, HTTPS, user-info, malformed, and wrong-port values are rejected.
+- Accepted sockets receive a configurable 0.1-to-300-second timeout, defaulting to ten seconds, to
+  bound stalled header/body reads. This timeout is not a workflow execution deadline.
+- JSON and static responses add same-origin resource policy and anti-framing headers; JSON receives
+  a non-executable content security policy. CORS remains disabled.
+- A configurable retained-job ceiling defaults to 10,000. Exact idempotent replays remain readable
+  at the ceiling, while submissions that would create another durable record fail explicitly.
+- The operator CLI previews retention deletion by default and requires `--confirm` to mutate data.
+  It selects a bounded oldest-first batch, deletes only succeeded/failed/cancelled jobs strictly
+  older than an explicit cutoff, and relies on an atomic transaction plus foreign-key cascade for
+  their events. Queued and running work is never selected. Database connections request SQLite
+  secure deletion as defense in depth, without claiming physical erasure from WAL, snapshots,
+  storage media, or backups.
+- Dependabot checks Python, npm, and GitHub Actions weekly. CI actions are pinned to immutable
+  reviewed commits, and CI audits resolved Python runtime dependencies and the locked frontend
+  build dependency tree in addition to lint, tests, typing, packaging, and clean-wheel checks.
+- The deployment runbook fixes the supported boundary at one trusted local operator, defines
+  least-privilege storage/token/backup/monitoring/retention practices, and rejects remote or
+  multi-user exposure. The incident runbook covers containment, secret rotation, evidence
+  preservation, investigation, rebuild/restore, privacy deletion, and post-incident regression.
+- Adversarial tests cover authority confusion and duplication, unsafe origins, connection-bound
+  validation, retained-capacity behavior, purge cutoff/state preservation, and destructive CLI
+  confirmation.
+
+These controls reduce common local-web and operational failure modes; they do not turn PageTrace
+into a remote production service. Purging a backend job does not delete the corresponding input,
+content-addressed artifacts, logs, exports, screenshots, or backups. Operators must manage those
+stores separately.
 
 ## Security principles
 
@@ -260,7 +295,7 @@ artifact store, browser profile, and screen contents.
 
 ## Residual risks and future security work
 
-Milestones 1 through 9 are in-process processing boundaries, not operating-system sandboxes.
+Milestones 1 through 10 are in-process processing boundaries, not operating-system sandboxes.
 Residual risks include vulnerabilities or pathological CPU/memory behavior in pypdf and
 pdfplumber text/content-stream/layout parsing, Pillow, Python, or native image codecs; very large
 decompressed text streams; deeply nested PDF object graphs; filesystem exhaustion; storage-root
@@ -279,9 +314,11 @@ complete bounded corpus for each query without persistent indexing or hard time/
 Extractive QA scans and tokenizes returned hit text in-process without hard time/memory isolation;
 its answer bounds limit accepted output rather than all intermediate work. Quality-suite parsing
 and aggregation are also in-process; the CLI byte limit bounds accepted serialized input but not a
-separate CPU, memory, or wall-clock sandbox. Backend queue/result limits bound accepted persistent
-data, not handler CPU, memory, disk use, or execution time. SQLite and the artifact store remain
-vulnerable to local privileged tampering, filesystem exhaustion, and operator misconfiguration.
+separate CPU, memory, or wall-clock sandbox. Backend request/result/queue/event/retained-record
+limits bound accepted persistent data, not total database bytes, handler CPU or memory, disk use,
+or workflow execution time. The HTTP socket timeout does not interrupt running work. SQLite and the
+artifact store remain vulnerable to local privileged tampering, filesystem exhaustion, and
+operator misconfiguration.
 
 Future threat modeling and milestones will cover at least:
 
@@ -295,9 +332,9 @@ Future threat modeling and milestones will cover at least:
 
 Prompt injection is already a data-handling concern because PageTrace extracts untrusted text.
 RapidOCR is a local purpose-built OCR model and its output remains untrusted data; no LLM, VLM, or
-external model service consumes document content. Model-provider disclosure, process
-isolation, broader quotas, privacy controls, supply-chain hardening, and operational incident
-controls remain later roadmap responsibilities.
+external model service consumes document content. Future model-provider disclosure, hard process
+isolation, storage-byte quotas, remote/multi-user controls, and independently exercised disaster
+recovery remain later responsibilities.
 
 ## Supported versions
 

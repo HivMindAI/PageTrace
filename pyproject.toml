@@ -42,6 +42,7 @@ structure = [
 dev = [
   "build>=1.2,<2",
   "mypy>=1.14,<2",
+  "pip-audit>=2.10.1,<3",
   "pytest>=8.3,<10",
   "pytest-cov>=6,<8",
   "ruff>=0.9,<1",
@@ -55,6 +56,7 @@ packages = ["src/pagetrace"]
 include = [
   "/CHANGELOG.md",
   "/CONTRIBUTING.md",
+  "/docs",
   "/LICENSE",
   "/README.md",
   "/ROADMAP.md",

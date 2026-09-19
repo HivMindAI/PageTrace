@@ -7,7 +7,7 @@ from collections.abc import Iterator
 from http import HTTPStatus
 from http.server import ThreadingHTTPServer
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
@@ -98,6 +98,9 @@ def test_http_health_authentication_and_security_headers(
     assert payload == {"status": "ok"}
     assert headers["Cache-Control"] == "no-store"
     assert headers["X-Content-Type-Options"] == "nosniff"
+    assert headers["X-Frame-Options"] == "DENY"
+    assert headers["Cross-Origin-Resource-Policy"] == "same-origin"
+    assert headers["Content-Security-Policy"] == "default-src 'none'; frame-ancestors 'none'"
     assert "Python" not in headers["Server"]
 
     status, payload, headers = _request(server, "GET", "/readyz", authenticated=False)
@@ -108,6 +111,69 @@ def test_http_health_authentication_and_security_headers(
     assert status == HTTPStatus.UNAUTHORIZED
     assert payload["error"] == {"code": "unauthorized", "message": "authentication required"}
     assert headers["WWW-Authenticate"] == 'Bearer realm="pagetrace"'
+
+
+def test_http_rejects_untrusted_hosts_and_origins(
+    backend_server: tuple[ThreadingHTTPServer, BackendService],
+) -> None:
+    server, _ = backend_server
+    for host in (
+        "example.test",
+        f"127.0.0.1:{server.server_port + 1}",
+        f"127.0.0.1:{server.server_port}@example.test",
+    ):
+        status, payload, _ = _request(
+            server, "GET", "/healthz", authenticated=False, extra_headers={"Host": host}
+        )
+        assert status == HTTPStatus.BAD_REQUEST
+        assert payload["error"]["code"] == "invalid_request"  # type: ignore[index]
+
+    valid_origin = f"http://localhost:{server.server_port}"
+    status, payload, _ = _request(
+        server,
+        "GET",
+        "/healthz",
+        authenticated=False,
+        extra_headers={"Host": f"localhost:{server.server_port}", "Origin": valid_origin},
+    )
+    assert status == HTTPStatus.OK
+    assert payload == {"status": "ok"}
+
+    for origin in (
+        f"https://127.0.0.1:{server.server_port}",
+        "http://example.test",
+        "null",
+        f"http://127.0.0.1:{server.server_port + 1}",
+    ):
+        status, payload, _ = _request(
+            server,
+            "GET",
+            "/healthz",
+            authenticated=False,
+            extra_headers={"Origin": origin},
+        )
+        assert status == HTTPStatus.BAD_REQUEST
+        assert payload["error"]["message"] == "request origin is not allowed"  # type: ignore[index]
+
+
+def test_http_rejects_duplicate_host_and_origin_headers(
+    backend_server: tuple[ThreadingHTTPServer, BackendService],
+) -> None:
+    server, _ = backend_server
+    for header in ("Host", "Origin"):
+        connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+        connection.putrequest("GET", "/healthz", skip_host=True)
+        connection.putheader("Host", f"127.0.0.1:{server.server_port}")
+        if header == "Host":
+            connection.putheader("Host", f"localhost:{server.server_port}")
+        else:
+            connection.putheader("Origin", f"http://127.0.0.1:{server.server_port}")
+            connection.putheader("Origin", f"http://localhost:{server.server_port}")
+        connection.endheaders()
+        response = connection.getresponse()
+        assert response.status == HTTPStatus.BAD_REQUEST
+        response.read()
+        connection.close()
 
 
 def test_http_submit_execute_inspect_events_and_metrics(
@@ -321,6 +387,24 @@ def test_http_server_configuration_validation(tmp_path: Path) -> None:
             bearer_token=_TOKEN,
             max_request_bytes=0,
         )
+    for timeout in (True, 0, float("inf"), 301):
+        with pytest.raises(ValueError, match="connection_timeout_seconds"):
+            create_http_server(
+                service,
+                host="127.0.0.1",
+                port=1,
+                bearer_token=_TOKEN,
+                connection_timeout_seconds=timeout,
+            )
+    timeout_server = create_http_server(
+        service,
+        host="127.0.0.1",
+        port=0,
+        bearer_token=_TOKEN,
+        connection_timeout_seconds=1.5,
+    )
+    assert cast(Any, timeout_server).connection_timeout_seconds == 1.5
+    timeout_server.server_close()
     missing = tmp_path / "missing-web"
     with pytest.raises(ValueError, match="web root"):
         create_http_server(
@@ -360,6 +444,7 @@ def test_http_serves_packaged_web_assets_with_browser_security_headers(tmp_path:
         assert headers["Cache-Control"] == "no-store"
         assert headers["Content-Security-Policy"].startswith("default-src 'self'")
         assert headers["X-Frame-Options"] == "DENY"
+        assert headers["Cross-Origin-Resource-Policy"] == "same-origin"
         assert headers["Referrer-Policy"] == "no-referrer"
         assert "camera=()" in headers["Permissions-Policy"]
 

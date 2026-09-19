@@ -193,6 +193,11 @@ class SqliteJobStore:
                             "idempotency key was already used for a different request"
                         )
                     return job, False
+                retained = int(connection.execute("SELECT COUNT(*) FROM jobs").fetchone()[0])
+                if retained >= self._limits.max_retained_jobs:
+                    raise BackendCapacityError(
+                        "backend retained job limit was reached; purge terminal jobs"
+                    )
                 queued = int(
                     connection.execute(
                         "SELECT COUNT(*) FROM jobs WHERE status = ?", (JobStatus.QUEUED.value,)
@@ -494,6 +499,51 @@ class SqliteJobStore:
         except sqlite3.Error as exc:
             raise BackendPersistenceError("backend metrics could not be read") from exc
 
+    def preview_terminal_job_purge(self, *, finished_before: datetime, limit: int = 1_000) -> int:
+        """Count a bounded batch of terminal jobs eligible for permanent deletion."""
+
+        cutoff = self._purge_cutoff(finished_before, limit)
+        try:
+            with self._connect() as connection:
+                return len(self._terminal_job_ids(connection, cutoff, limit))
+        except sqlite3.Error as exc:
+            raise BackendPersistenceError("terminal job purge could not be previewed") from exc
+
+    def purge_terminal_jobs(self, *, finished_before: datetime, limit: int = 1_000) -> int:
+        """Permanently delete a bounded oldest-first batch of terminal jobs and events."""
+
+        cutoff = self._purge_cutoff(finished_before, limit)
+        try:
+            with self._transaction() as connection:
+                job_ids = self._terminal_job_ids(connection, cutoff, limit)
+                if not job_ids:
+                    return 0
+                deleted = connection.execute(
+                    """
+                    DELETE FROM jobs
+                    WHERE job_id IN (
+                        SELECT job_id FROM jobs
+                        WHERE status IN (?, ?, ?) AND finished_at < ?
+                        ORDER BY finished_at, job_id
+                        LIMIT ?
+                    )
+                    """,
+                    (
+                        JobStatus.SUCCEEDED.value,
+                        JobStatus.FAILED.value,
+                        JobStatus.CANCELLED.value,
+                        cutoff,
+                        limit,
+                    ),
+                ).rowcount
+                if deleted != len(job_ids):
+                    raise BackendPersistenceError("terminal job purge was not atomic")
+                return deleted
+        except BackendPersistenceError:
+            raise
+        except sqlite3.Error as exc:
+            raise BackendPersistenceError("terminal jobs could not be purged") from exc
+
     def recover_interrupted_jobs(self) -> tuple[StoredJob, ...]:
         """Move jobs left running by a stopped process into retry or terminal state."""
 
@@ -574,6 +624,7 @@ class SqliteJobStore:
             connection = sqlite3.connect(self._path, timeout=5.0)
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("PRAGMA secure_delete = ON")
             connection.execute("PRAGMA busy_timeout = 5000")
             yield connection
         finally:
@@ -626,6 +677,37 @@ class SqliteJobStore:
         if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
             raise BackendPersistenceError("backend clock must return an aware datetime")
         return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+    def _purge_cutoff(self, finished_before: datetime, limit: int) -> str:
+        if (
+            not isinstance(finished_before, datetime)
+            or finished_before.tzinfo is None
+            or finished_before.utcoffset() is None
+        ):
+            raise BackendInputError("finished_before must be a timezone-aware datetime")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 10_000:
+            raise BackendInputError("purge limit must be an integer from 1 to 10000")
+        return finished_before.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+    def _terminal_job_ids(
+        self, connection: sqlite3.Connection, cutoff: str, limit: int
+    ) -> tuple[str, ...]:
+        rows = connection.execute(
+            """
+            SELECT job_id FROM jobs
+            WHERE status IN (?, ?, ?) AND finished_at < ?
+            ORDER BY finished_at, job_id
+            LIMIT ?
+            """,
+            (
+                JobStatus.SUCCEEDED.value,
+                JobStatus.FAILED.value,
+                JobStatus.CANCELLED.value,
+                cutoff,
+                limit,
+            ),
+        ).fetchall()
+        return tuple(str(row["job_id"]) for row in rows)
 
     def _validate_job_id(self, job_id: str) -> None:
         if not is_job_id(job_id):

@@ -9,6 +9,16 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 
 ### Added
 
+- Milestone 10 backend hardening with exact loopback Host/Origin validation, duplicate-authority
+  rejection, bounded stalled-connection handling, stronger same-origin response headers, and
+  adversarial HTTP tests.
+- A configurable 10,000-job retained-record ceiling plus a bounded oldest-first terminal-job purge
+  that previews by default, requires explicit confirmation, preserves active jobs, and cascades
+  lifecycle-event deletion, with SQLite secure deletion requested as defense in depth.
+- Weekly Dependabot coverage for Python, npm, and GitHub Actions, CI audits for Python runtime and
+  frontend build dependencies, immutable CI action pins, and deployment/incident-response runbooks
+  covering least privilege, retention, backup/restore, monitoring, containment, evidence
+  preservation, and recovery.
 - Milestone 9 responsive TypeScript Evidence Desk for document intake, evidence-grounded questions,
   quality evaluation, durable job/event inspection, cancellation, known-job reopening, and
   operational counters.

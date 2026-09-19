@@ -57,6 +57,7 @@ class BackendLimits:
     max_request_bytes: int = 16 * 1024 * 1024
     max_result_bytes: int = 32 * 1024 * 1024
     max_queued_jobs: int = 1_000
+    max_retained_jobs: int = 10_000
     max_attempts: int = 3
     max_error_characters: int = 1_000
     max_events_per_job: int = 1_000
@@ -66,6 +67,7 @@ class BackendLimits:
             ("max_request_bytes", self.max_request_bytes),
             ("max_result_bytes", self.max_result_bytes),
             ("max_queued_jobs", self.max_queued_jobs),
+            ("max_retained_jobs", self.max_retained_jobs),
             ("max_attempts", self.max_attempts),
             ("max_error_characters", self.max_error_characters),
             ("max_events_per_job", self.max_events_per_job),

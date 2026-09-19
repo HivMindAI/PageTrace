@@ -71,6 +71,7 @@ def store(tmp_path: Path, job_ids: Iterator[str]) -> SqliteJobStore:
         ("max_request_bytes", 0),
         ("max_result_bytes", -1),
         ("max_queued_jobs", True),
+        ("max_retained_jobs", 0),
         ("max_attempts", 0),
         ("max_error_characters", 0),
         ("max_events_per_job", 0),
@@ -81,6 +82,7 @@ def test_backend_limits_reject_non_positive_values(field: str, value: object) ->
         "max_request_bytes": 1,
         "max_result_bytes": 1,
         "max_queued_jobs": 1,
+        "max_retained_jobs": 1,
         "max_attempts": 1,
         "max_error_characters": 1,
         "max_events_per_job": 1,
@@ -88,6 +90,12 @@ def test_backend_limits_reject_non_positive_values(field: str, value: object) ->
     values[field] = value
     with pytest.raises(ValueError, match="positive integer"):
         BackendLimits(**values)
+
+
+def test_backend_store_enables_connection_security_pragmas(store: SqliteJobStore) -> None:
+    with store._connect() as connection:
+        assert connection.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+        assert connection.execute("PRAGMA secure_delete").fetchone()[0] == 1
 
 
 def test_canonical_json_boundary_is_strict() -> None:
@@ -252,6 +260,69 @@ def test_store_enforces_submission_and_query_boundaries(tmp_path: Path) -> None:
         store.list_events(first.job_id, after_sequence=-1)
     with pytest.raises(BackendInputError):
         store.list_events(first.job_id, limit=0)
+
+
+def test_store_caps_retained_jobs_but_allows_idempotent_replay(tmp_path: Path) -> None:
+    ids = (f"job-{number:032x}" for number in range(1, 5))
+    store = SqliteJobStore(
+        tmp_path / "retained.sqlite3",
+        limits=BackendLimits(max_queued_jobs=4, max_retained_jobs=1),
+        id_factory=lambda: next(ids),
+    )
+    store.initialize()
+    first, _ = store.submit(WorkflowName.EVALUATE_QUALITY, {}, idempotency_key="first")
+
+    replay, created = store.submit(WorkflowName.EVALUATE_QUALITY, {}, idempotency_key="first")
+    assert replay == first
+    assert created is False
+    with pytest.raises(BackendCapacityError, match="retained job limit"):
+        store.submit(WorkflowName.EVALUATE_QUALITY, {}, idempotency_key="second")
+
+
+def test_store_previews_and_purges_only_old_terminal_jobs(tmp_path: Path) -> None:
+    current = [datetime(2026, 1, 1, tzinfo=UTC)]
+    ids = (f"job-{number:032x}" for number in range(1, 6))
+    store = SqliteJobStore(
+        tmp_path / "purge.sqlite3",
+        clock=lambda: current[0],
+        id_factory=lambda: next(ids),
+    )
+    store.initialize()
+
+    oldest, _ = store.submit(WorkflowName.EVALUATE_QUALITY, {}, idempotency_key="oldest")
+    store.claim_next()
+    store.complete(oldest.job_id, {"sensitive": "oldest"})
+
+    current[0] = datetime(2026, 1, 1, 12, tzinfo=UTC)
+    old, _ = store.submit(WorkflowName.EVALUATE_QUALITY, {}, idempotency_key="old")
+    store.claim_next()
+    store.complete(old.job_id, {"sensitive": "old"})
+
+    current[0] = datetime(2026, 1, 3, tzinfo=UTC)
+    recent, _ = store.submit(WorkflowName.EVALUATE_QUALITY, {}, idempotency_key="recent")
+    store.claim_next()
+    store.complete(recent.job_id, {"sensitive": "recent"})
+    queued, _ = store.submit(WorkflowName.EVALUATE_QUALITY, {}, idempotency_key="queued")
+
+    cutoff = datetime(2026, 1, 2, tzinfo=UTC)
+    assert store.preview_terminal_job_purge(finished_before=cutoff) == 2
+    assert store.preview_terminal_job_purge(finished_before=cutoff, limit=1) == 1
+    assert store.purge_terminal_jobs(finished_before=cutoff, limit=1) == 1
+    with pytest.raises(BackendNotFoundError):
+        store.get(oldest.job_id)
+    assert store.get(old.job_id).status is JobStatus.SUCCEEDED
+    assert store.get(recent.job_id).status is JobStatus.SUCCEEDED
+    assert store.get(queued.job_id).status is JobStatus.QUEUED
+    assert store.purge_terminal_jobs(finished_before=cutoff) == 1
+    with pytest.raises(BackendNotFoundError):
+        store.get(old.job_id)
+    assert store.metrics().total_events == 4
+    assert store.purge_terminal_jobs(finished_before=cutoff) == 0
+
+    with pytest.raises(BackendInputError, match="timezone-aware"):
+        store.preview_terminal_job_purge(finished_before=datetime(2026, 1, 2))
+    with pytest.raises(BackendInputError, match="purge limit"):
+        store.purge_terminal_jobs(finished_before=cutoff, limit=0)
 
 
 def test_store_retries_cancellation_and_recovery(tmp_path: Path) -> None:

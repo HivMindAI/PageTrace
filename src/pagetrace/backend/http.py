@@ -5,7 +5,9 @@ from __future__ import annotations
 import hmac
 import json
 import logging
+import math
 import re
+import socket
 import stat
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -58,6 +60,21 @@ class _LoopbackHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
     request_queue_size = 128
 
+    def __init__(
+        self,
+        server_address: tuple[str, int],
+        request_handler: type[BaseHTTPRequestHandler],
+        *,
+        connection_timeout_seconds: float,
+    ) -> None:
+        self.connection_timeout_seconds = connection_timeout_seconds
+        super().__init__(server_address, request_handler)
+
+    def get_request(self) -> tuple[socket.socket, Any]:
+        request, client_address = super().get_request()
+        request.settimeout(self.connection_timeout_seconds)
+        return request, client_address
+
 
 def create_http_server(
     service: BackendService,
@@ -67,6 +84,7 @@ def create_http_server(
     bearer_token: str,
     max_request_bytes: int | None = None,
     web_root: Path | None = None,
+    connection_timeout_seconds: float = 10.0,
 ) -> ThreadingHTTPServer:
     """Create a loopback-only authenticated server without starting it."""
 
@@ -85,9 +103,18 @@ def create_http_server(
     )
     if isinstance(body_limit, bool) or not isinstance(body_limit, int) or body_limit < 1:
         raise ValueError("max_request_bytes must be a positive integer")
+    if (
+        isinstance(connection_timeout_seconds, bool)
+        or not isinstance(connection_timeout_seconds, (int, float))
+        or not math.isfinite(connection_timeout_seconds)
+        or not 0.1 <= connection_timeout_seconds <= 300
+    ):
+        raise ValueError("connection_timeout_seconds must be from 0.1 through 300")
     static_root = _validate_web_root(web_root)
     handler = _handler_type(service, bearer_token.encode(), body_limit, static_root)
-    server = _LoopbackHTTPServer((host, port), handler)
+    server = _LoopbackHTTPServer(
+        (host, port), handler, connection_timeout_seconds=float(connection_timeout_seconds)
+    )
     return server
 
 
@@ -131,6 +158,7 @@ def _handler_type(
 
         def _dispatch(self, method: str) -> None:
             try:
+                self._validate_request_metadata()
                 if self.headers.get("Transfer-Encoding") is not None:
                     raise BackendInputError("transfer encoding is not supported")
                 parsed = urlsplit(self.path)
@@ -170,6 +198,17 @@ def _handler_type(
                     HTTPStatus.INTERNAL_SERVER_ERROR,
                     {"error": {"code": "internal_error", "message": "request failed"}},
                 )
+
+        def _validate_request_metadata(self) -> None:
+            host_values = self.headers.get_all("Host", [])
+            server_port = cast(ThreadingHTTPServer, self.server).server_port
+            if len(host_values) != 1 or not _loopback_authority(host_values[0], server_port):
+                raise BackendInputError("Host header is invalid")
+            origin_values = self.headers.get_all("Origin", [])
+            if len(origin_values) > 1 or (
+                origin_values and not _loopback_origin(origin_values[0], server_port)
+            ):
+                raise BackendInputError("request origin is not allowed")
 
         def _dispatch_authenticated(self, method: str, path: str, query: str) -> None:
             if method == "POST" and path == "/v1/jobs" and not query:
@@ -289,6 +328,7 @@ def _handler_type(
             self.send_header("Content-Security-Policy", _CONTENT_SECURITY_POLICY)
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Cross-Origin-Resource-Policy", "same-origin")
             self.send_header("Referrer-Policy", "no-referrer")
             self.send_header(
                 "Permissions-Policy",
@@ -402,7 +442,12 @@ def _handler_type(
             self.send_header("Cache-Control", "no-store")
             self.send_header("Connection", "close")
             self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Cross-Origin-Resource-Policy", "same-origin")
             self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header(
+                "Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"
+            )
             if authenticate:
                 self.send_header("WWW-Authenticate", 'Bearer realm="pagetrace"')
             if allow is not None:
@@ -429,6 +474,38 @@ def _validate_web_root(web_root: Path | None) -> Path | None:
         raise
     except OSError as exc:
         raise ValueError("web root must contain a readable regular index.html") from exc
+
+
+def _loopback_authority(value: str, expected_port: int) -> bool:
+    try:
+        parsed = urlsplit(f"//{value}")
+        port = parsed.port
+    except ValueError:
+        return False
+    return (
+        parsed.username is None
+        and parsed.password is None
+        and parsed.path == ""
+        and parsed.query == ""
+        and parsed.fragment == ""
+        and parsed.hostname is not None
+        and parsed.hostname.lower() in {"127.0.0.1", "::1", "localhost"}
+        and (port if port is not None else 80) == expected_port
+    )
+
+
+def _loopback_origin(value: str, expected_port: int) -> bool:
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return False
+    return (
+        parsed.scheme.lower() == "http"
+        and parsed.path == ""
+        and parsed.query == ""
+        and parsed.fragment == ""
+        and _loopback_authority(parsed.netloc, expected_port)
+    )
 
 
 def _safe_static_file(root: Path, relative: Path) -> Path:

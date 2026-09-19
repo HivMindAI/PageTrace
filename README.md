@@ -475,7 +475,8 @@ key to the workflow and canonical request fingerprint. Workers claim jobs atomic
 bounded attempts and result sizes, and recover jobs left running after a coordinated single-host
 process stop. The built-in HTTP server binds only to loopback, requires a 32–512 character bearer
 token for all `/v1` routes, and exposes unauthenticated liveness/readiness checks without document
-data.
+data. It also validates the exact loopback Host and optional Origin, bounds stalled connections,
+and emits same-origin browser protections.
 
 Initialize a local backend, run a worker, or serve the API with:
 
@@ -484,6 +485,10 @@ pagetrace-backend --database .pagetrace/backend.sqlite3 init
 pagetrace-backend --database .pagetrace/backend.sqlite3 worker
 # Set PAGETRACE_BACKEND_TOKEN to a high-entropy secret first.
 pagetrace-backend --database .pagetrace/backend.sqlite3 serve
+# Preview, then confirm, deletion of terminal jobs older than seven days.
+pagetrace-backend --database .pagetrace/backend.sqlite3 purge --older-than-hours 168
+pagetrace-backend --database .pagetrace/backend.sqlite3 \
+  purge --older-than-hours 168 --confirm
 ```
 
 Open `http://127.0.0.1:8765/` and enter the same bearer token. The Evidence Desk keeps that token
@@ -511,9 +516,9 @@ following stable envelope:
 `evaluate_quality` accepts a canonical suite object and an optional baseline report object. Unknown
 workflow fields are rejected rather than ignored.
 
-The HTTP boundary is deliberately single-host and standard-library based. Put a separately
-hardened TLS reverse proxy in front of it if another local application needs access; do not expose
-the built-in server directly to an untrusted network.
+The HTTP boundary is deliberately single-host and standard-library based. It accepts only exact
+loopback Host/Origin authorities on the listening port. Do not expose, forward, or tunnel the
+built-in server to an untrusted network; remote and multi-user deployment are unsupported.
 
 The packaged web assets are public so the login screen can load, while all `/v1` data routes remain
 bearer-authenticated. The server accepts only its generated asset-name pattern, rejects symlinked or
@@ -574,7 +579,13 @@ expire the SQLite database and artifact store according to their data-retention 
 Bearer authentication is not transport encryption; the built-in server is loopback-only and does
 not provide TLS, user accounts, per-user authorization, distributed leases, hard execution
 timeouts, or operating-system isolation. Cancellation of a running in-process handler takes effect
-when that handler returns.
+when that handler returns. The backend defaults to 10,000 retained jobs and rejects new work at the
+ceiling. Its explicit purge command permanently deletes only bounded batches of terminal jobs and
+their events; it does not delete content-addressed artifacts, inputs, logs, exports, or backups.
+
+See [deployment and operations](docs/DEPLOYMENT.md) for the supported local topology, retention,
+backup, monitoring, and upgrade checklist, and [incident response](docs/INCIDENT_RESPONSE.md) for
+containment, evidence preservation, recovery, privacy deletion, and post-incident review.
 
 All extracted text remains untrusted document data. PageTrace does not execute embedded commands,
 scripts, URLs, or instruction-like text, and no extracted content should be treated as a system or
@@ -587,6 +598,7 @@ ruff check .
 ruff format --check .
 mypy src tests
 pytest
+pip-audit --local --skip-editable
 python -m build
 python -m twine check --strict dist/*
 git diff --check
@@ -601,6 +613,8 @@ clean-wheel import and CLI smoke tests used by continuous integration.
 - [SECURITY.md](SECURITY.md) — implemented controls, residual risks, and reporting
 - [ROADMAP.md](ROADMAP.md) — milestone responsibilities
 - [CHANGELOG.md](CHANGELOG.md) — unreleased changes
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — supported deployment and operational controls
+- [docs/INCIDENT_RESPONSE.md](docs/INCIDENT_RESPONSE.md) — incident handling runbook
 
 ## License
 

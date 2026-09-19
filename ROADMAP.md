@@ -118,10 +118,21 @@ content security policy, anti-framing and MIME-sniffing protections, and immutab
 fingerprinted assets. This remains a single-host inspection product, not a multi-user deployment,
 and is subject to milestone review and acceptance.
 
-## Milestone 10 — Production & Security Hardening
+## Milestone 10 — Production & Security Hardening (implementation pending acceptance)
 
 Harden isolation, quotas, privacy, dependency and supply-chain controls, incident readiness,
 deployment, and ongoing adversarial testing.
+
+The current implementation rejects untrusted or duplicate HTTP Host/Origin metadata, applies a
+bounded connection timeout, caps retained backend jobs, and provides an oldest-first terminal-job
+purge with preview, explicit confirmation, and event cascading. Weekly dependency update coverage
+spans Python, npm, and GitHub Actions; CI audits Python runtime and frontend build dependencies.
+Deployment and incident-response runbooks define the supported loopback topology, least privilege,
+backup/restore, monitoring, containment, evidence preservation, recovery, and complete privacy
+deletion responsibilities. Adversarial tests cover authority confusion, retention capacity,
+cutoff/terminal-state preservation, and destructive-operation validation. This does not add hard
+parser/workflow CPU or memory isolation, TLS, remote access, or multi-user authorization and
+remains subject to milestone review and acceptance.
 
 ## Milestone 11 — Portfolio v1.0
 
