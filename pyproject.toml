@@ -34,7 +34,7 @@ pagetrace-backend = "pagetrace.backend.cli:main"
 ocr = [
   "onnxruntime>=1.22,<2",
   "pypdfium2>=5,<6",
-  "rapidocr>=3.9,<4",
+  "rapidocr>=3.9.2,<4",
 ]
 structure = [
   "pdfplumber>=0.11.9,<0.12",
