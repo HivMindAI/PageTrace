@@ -1,0 +1,8 @@
+# Output-affecting dependency versions used for the PageTrace v1.0 portfolio evidence.
+# Install with: python -m pip install -c requirements/portfolio-constraints.txt -e ".[ocr,structure]"
+Pillow==12.3.0
+onnxruntime==1.30.0
+pdfplumber==0.11.10
+pypdf==6.18.1
+pypdfium2==5.13.0
+rapidocr==3.9.2

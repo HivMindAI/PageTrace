@@ -16,11 +16,13 @@ PageTrace is guided by four ideas:
 
 ## Current status
 
-PageTrace is **pre-alpha**. Milestones 0, 1, and 2A are complete. Milestone 2B routed OCR,
+PageTrace is a **v1.0 portfolio release candidate**. Milestones 0, 1, and 2A are complete. Milestone 2B routed OCR,
 Milestone 3 structured representation, Milestone 4 provenance-aware corpus construction,
 Milestone 5 retrieval baselines/evaluation, Milestone 6 evidence-grounded QA, Milestone 7
 consolidated quality evaluation, Milestone 8 product backend, and Milestone 9 evidence-first web
-product are implemented and pending acceptance. The current package can:
+product, Milestone 10 hardening, and the Milestone 11 reproducible portfolio are implemented and
+pending acceptance. Version 1.0 describes the portfolio/API milestone, not a claim that the local
+service is suitable for remote or multi-user production deployment. The current package can:
 
 - stage untrusted local PDF, PNG, and JPEG files under explicit byte/page/pixel limits;
 - identify supported media from content signatures and confirm it with pypdf or Pillow;
@@ -57,7 +59,9 @@ product are implemented and pending acceptance. The current package can:
 - inspect source identity, page geometry, exact citations, retrieval context, abstention, quality
   findings, durable activity, and system counters in a packaged evidence-first web interface; and
 - apply explicit quality gates and directional baseline-regression rules with CI-friendly status
-  codes.
+  codes; and
+- reproduce a two-page evidence demonstration with an exact cited answer, explicit abstention,
+  canonical retrieval/quality evaluations, file digests, and machine-readable limitations.
 
 An OCR-candidate status remains routing information rather than proof that OCR is necessary or
 accurate. OCR output is untrusted derived data with measured confidence, not verified truth.
@@ -92,6 +96,10 @@ cross-stage metrics, human rubrics, gates, and regressions (Milestone 7 pending 
 durable authenticated product backend (Milestone 8 pending acceptance)
         |
 evidence-first web product (Milestone 9 pending acceptance)
+        |
+local security and operational hardening (Milestone 10 pending acceptance)
+        |
+reproducible evidence-backed portfolio (Milestone 11 pending acceptance)
 ```
 
 See [ROADMAP.md](ROADMAP.md) for milestone scope boundaries.
@@ -112,6 +120,22 @@ The base install remains sufficient for ingestion and Milestone 2A extraction. I
 extra only when running Milestone 2B OCR; it adds RapidOCR, CPU ONNX Runtime, and pypdfium2. The
 `structure` extra adds pdfplumber for positioned PDF words and line-based table detection. OCR
 geometry replay also requires the `ocr` extra when the selected OCR artifact contains routed pages.
+
+## Reproducible v1.0 portfolio
+
+Install the output-affecting reference versions and run the complete evidence demonstration:
+
+```bash
+python -m pip install \
+  -c requirements/portfolio-constraints.txt \
+  -e ".[dev,ocr,structure]"
+pagetrace portfolio-demo portfolio-output
+```
+
+The command creates a deterministic PDF, processes it through the complete local pipeline, and
+writes canonical evidence, evaluation, quality, digest, and limitation records. It demonstrates
+one exact source-cited answer and one correct no-evidence abstention. See the
+[v1.0 portfolio guide](docs/PORTFOLIO.md) for reproduction and claim boundaries.
 
 ## Python API
 
@@ -375,6 +399,7 @@ pagetrace answer sha256-<64-lowercase-hex-characters> \
   corpus-sha256-<64-lowercase-hex-characters> "revenue growth" \
   --top-k 10 --minimum-coverage 0.25 --store .pagetrace --json
 pagetrace evaluate-quality quality-suite.json --baseline prior-quality-report.json --json
+pagetrace portfolio-demo portfolio-output
 
 # The module entry point is equivalent.
 python -m pagetrace ingest annual-report.pdf --store .pagetrace --json
@@ -599,6 +624,8 @@ ruff format --check .
 mypy src tests
 pytest
 pip-audit --local --skip-editable
+pagetrace portfolio-demo portfolio-run-one
+pagetrace portfolio-demo portfolio-run-two
 python -m build
 python -m twine check --strict dist/*
 git diff --check
@@ -615,6 +642,9 @@ clean-wheel import and CLI smoke tests used by continuous integration.
 - [CHANGELOG.md](CHANGELOG.md) — unreleased changes
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — supported deployment and operational controls
 - [docs/INCIDENT_RESPONSE.md](docs/INCIDENT_RESPONSE.md) — incident handling runbook
+
+- [docs/PORTFOLIO.md](docs/PORTFOLIO.md) — reproducible evidence demonstration and claim limits
+- [docs/RELEASING.md](docs/RELEASING.md) — tagged candidate verification and release checklist
 
 ## License
 

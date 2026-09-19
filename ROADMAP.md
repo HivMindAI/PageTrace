@@ -134,7 +134,7 @@ cutoff/terminal-state preservation, and destructive-operation validation. This d
 parser/workflow CPU or memory isolation, TLS, remote access, or multi-user authorization and
 remains subject to milestone review and acceptance.
 
-## Milestone 11 — Portfolio v1.0
+## Milestone 11 — Portfolio v1.0 (implementation pending acceptance)
 
 Deliver a documented, reproducible, evaluated v1.0 portfolio release with clearly stated limits
 and demonstrations grounded in real evidence.
@@ -142,3 +142,13 @@ and demonstrations grounded in real evidence.
 Advanced multimodal, vision-language-model, and chart intelligence is optional before v1.0. It
 should be introduced only when evaluated user needs and baseline limitations justify its added
 complexity, cost, and risk.
+
+The current implementation identifies itself as version 1.0.0 and includes an atomic
+`portfolio-demo` workflow. It generates a deterministic two-page PDF, executes the verified
+document-to-evidence pipeline, demonstrates an exact cited answer and explicit no-hit abstention,
+and emits canonical retrieval and quality evaluations plus a digest-indexed manifest with explicit
+limitations. A constrained reference environment and tag-only release workflow reproduce the
+manifest twice, run the full validation matrix, build distributions, and retain a checksummed
+candidate bundle for manual review. The synthetic fixture proves reproducibility and traceability,
+not general document accuracy or remote-production readiness, and the milestone remains subject to
+review and acceptance.

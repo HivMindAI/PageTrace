@@ -124,6 +124,7 @@ jobs:
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" evaluate-retrieval --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" answer --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" evaluate-quality --help
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" portfolio-demo --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace-backend" --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace-backend" purge --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -c \
@@ -136,3 +137,4 @@ jobs:
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace retrieve --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace answer --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace evaluate-quality --help
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace portfolio-demo --help

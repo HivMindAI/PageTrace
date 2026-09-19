@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pagetrace"
-version = "0.1.0.dev0"
+version = "1.0.0"
 description = "Deterministic document processing, evidence-grounded QA, and quality evaluation."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
+  "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Intended Audience :: Science/Research",
   "Operating System :: OS Independent",
@@ -59,6 +59,7 @@ include = [
   "/docs",
   "/LICENSE",
   "/README.md",
+  "/requirements",
   "/ROADMAP.md",
   "/SECURITY.md",
   "/pyproject.toml",

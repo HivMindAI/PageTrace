@@ -11,6 +11,7 @@ from pagetrace.corpus import CorpusLimitError, build_corpus_artifact
 from pagetrace.documents import ingest_document
 from pagetrace.extraction import ExtractionLimitError, extract_document_text
 from pagetrace.ocr import OcrEvaluationError
+from pagetrace.portfolio import PortfolioDemoError, PortfolioDemoResult
 from pagetrace.qa import QaConfig, QaError, answer_from_retrieval
 from pagetrace.quality import (
     MetricComparator,
@@ -91,6 +92,39 @@ def test_cli_parser_requires_a_command() -> None:
     with pytest.raises(SystemExit) as error:
         build_parser().parse_args([])
     assert error.value.code == 2
+
+
+def test_cli_portfolio_demo_output_and_expected_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "portfolio"
+    result = PortfolioDemoResult(
+        output_directory=output,
+        manifest_path=output / "portfolio-manifest.json",
+        document_id=f"sha256-{'1' * 64}",
+        corpus_artifact_id=f"corpus-sha256-{'2' * 64}",
+        answer_id=f"answer-sha256-{'3' * 64}",
+        abstention_id=f"answer-sha256-{'4' * 64}",
+        quality_report_id=f"quality-report-sha256-{'5' * 64}",
+    )
+    monkeypatch.setattr(pagetrace.cli, "run_portfolio_demo", lambda _output: result)
+
+    assert main(["portfolio-demo", str(output)]) == 0
+    rendered = capsys.readouterr().out
+    assert f"portfolio manifest: {result.manifest_path}" in rendered
+    assert f"document id: {result.document_id}" in rendered
+    assert f"quality report id: {result.quality_report_id}" in rendered
+
+    def fail(_output: Path) -> PortfolioDemoResult:
+        raise PortfolioDemoError("output already exists")
+
+    monkeypatch.setattr(pagetrace.cli, "run_portfolio_demo", fail)
+    assert main(["portfolio-demo", str(output)]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == "pagetrace: error: output already exists\n"
 
 
 def test_cli_extract_and_inspect_text_plain_output(

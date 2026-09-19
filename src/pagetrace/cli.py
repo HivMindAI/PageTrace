@@ -42,6 +42,7 @@ from pagetrace.ocr import (
     serialize_ocr_artifact,
     serialize_ocr_evaluation,
 )
+from pagetrace.portfolio import PortfolioDemoError, PortfolioDemoResult, run_portfolio_demo
 from pagetrace.qa import QaConfig, QaError, QaResult, answer_question, serialize_qa_result
 from pagetrace.quality import (
     QualityError,
@@ -272,6 +273,15 @@ def build_parser() -> argparse.ArgumentParser:
     quality_parser.add_argument(
         "--json", action="store_true", help="emit the canonical quality report"
     )
+    portfolio_parser = subparsers.add_parser(
+        "portfolio-demo",
+        help="run the reproducible v1.0 evidence and evaluation demonstration",
+    )
+    portfolio_parser.add_argument(
+        "output",
+        type=Path,
+        help="new directory for source, verified artifacts, evidence, and quality outputs",
+    )
     return parser
 
 
@@ -432,7 +442,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 ),
             )
             _print_qa_result(qa_result, as_json=arguments.json)
-        else:
+        elif arguments.command == "evaluate-quality":
             quality_report = evaluate_quality(
                 _read_quality_suite(arguments.suite),
                 baseline=(
@@ -446,6 +456,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 1
             if quality_report.status is QualityReportStatus.INCOMPLETE:
                 return 3
+        else:
+            _print_portfolio_demo(run_portfolio_demo(arguments.output))
     except (
         DocumentError,
         ExtractionError,
@@ -455,10 +467,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         RetrievalError,
         QaError,
         QualityError,
+        PortfolioDemoError,
     ) as exc:
         print(f"pagetrace: error: {exc}", file=sys.stderr)
         return 2
     return 0
+
+
+def _print_portfolio_demo(result: PortfolioDemoResult) -> None:
+    print(f"portfolio output: {result.output_directory}")
+    print(f"portfolio manifest: {result.manifest_path}")
+    print(f"document id: {result.document_id}")
+    print(f"corpus artifact id: {result.corpus_artifact_id}")
+    print(f"supported answer id: {result.answer_id}")
+    print(f"abstention id: {result.abstention_id}")
+    print(f"quality report id: {result.quality_report_id}")
 
 
 def _print_manifest(manifest: DocumentManifest, *, as_json: bool) -> None:

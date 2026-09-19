@@ -1,0 +1,93 @@
+name: Release Candidate
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-build:
+    name: Verify and build tagged release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node.js 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install locked frontend dependencies
+        working-directory: web
+        run: npm ci
+      - name: Audit frontend dependencies
+        working-directory: web
+        run: npm audit --audit-level=high
+      - name: Verify frontend
+        working-directory: web
+        run: |
+          npm run lint
+          npm test
+          npm run build
+      - name: Verify packaged frontend is current
+        run: git diff --exit-code -- src/pagetrace/web/dist
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Verify tag matches package version
+        shell: bash
+        run: |
+          version="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          test "${GITHUB_REF_NAME}" = "v${version}"
+      - name: Update package installer
+        run: python -m pip install --upgrade "pip==26.2.1"
+      - name: Install constrained release environment
+        run: >-
+          python -m pip install
+          -c requirements/portfolio-constraints.txt
+          -e ".[dev,ocr,structure]"
+      - name: Audit resolved Python dependencies
+        run: pip-audit --local --skip-editable
+      - name: Verify Python source
+        run: |
+          ruff check .
+          ruff format --check .
+          mypy --python-version 3.12 src tests
+          pytest
+      - name: Reproduce portfolio evidence twice
+        shell: bash
+        run: |
+          pagetrace portfolio-demo portfolio-run-one
+          pagetrace portfolio-demo portfolio-run-two
+          cmp portfolio-run-one/portfolio-manifest.json portfolio-run-two/portfolio-manifest.json
+      - name: Build distributions
+        run: python -m build
+      - name: Validate distributions
+        run: python -m twine check --strict dist/*
+      - name: Write distribution checksums
+        shell: bash
+        run: sha256sum dist/*.whl dist/*.tar.gz > dist/SHA256SUMS
+      - name: Upload reviewed release bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pagetrace-${{ github.ref_name }}
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/SHA256SUMS
+            portfolio-run-one/northstar-fy2025.pdf
+            portfolio-run-one/portfolio-manifest.json
+            portfolio-run-one/retrieval-dataset.json
+            portfolio-run-one/quality-report.json
+            portfolio-run-one/quality-suite.json
+            portfolio-run-one/retrieval-evaluation.json
+            portfolio-run-one/qa-supported-answer.json
+            portfolio-run-one/qa-abstention.json
+          if-no-files-found: error
+          retention-days: 30

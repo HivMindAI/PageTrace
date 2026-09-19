@@ -73,6 +73,10 @@ supported-version bounds, run the complete suite, and do not merge solely becaus
 green. A dependency audit covers known package advisories; it does not prove a package, native
 library, build script, or model artifact is trustworthy.
 
+Release changes must also reproduce the canonical portfolio manifest twice using the reviewed
+constraints and follow [docs/RELEASING.md](docs/RELEASING.md). Do not broaden a claim beyond the
+included fixtures, quality gates, and limitations merely because a versioned build succeeds.
+
 ## Clean-wheel smoke test
 
 After `python -m build`, create a fresh virtual environment, install the wheel from `dist/`, move
@@ -88,11 +92,17 @@ pagetrace inspect-ocr --help
 pagetrace evaluate-ocr --help
 pagetrace structure --help
 pagetrace inspect-structure --help
+pagetrace build-corpus --help
+pagetrace retrieve --help
+pagetrace answer --help
+pagetrace evaluate-quality --help
+pagetrace portfolio-demo --help
 pagetrace-backend --help
 python -I -m pagetrace --help
 python -I -m pagetrace extract-text --help
 python -I -m pagetrace ocr --help
 python -I -m pagetrace structure --help
+python -I -m pagetrace portfolio-demo --help
 ```
 
 The smoke test must use the wheel's interpreter and must not rely on an editable installation,

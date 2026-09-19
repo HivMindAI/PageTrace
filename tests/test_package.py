@@ -1,5 +1,8 @@
+import json
+import tomllib
 from importlib import resources
 from importlib.metadata import version
+from pathlib import Path
 
 import pagetrace
 import pagetrace.corpus
@@ -26,8 +29,23 @@ def test_package_imports() -> None:
 
 
 def test_package_version_matches_distribution_metadata() -> None:
-    """The public development version stays aligned with package metadata."""
+    """The public version stays aligned with installed distribution metadata."""
     assert pagetrace.__version__ == version("pagetrace")
+
+
+def test_release_versions_are_synchronized() -> None:
+    """Python and web release metadata describe the same portfolio version."""
+
+    root = Path(__file__).resolve().parents[1]
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    web_package = json.loads((root / "web" / "package.json").read_text(encoding="utf-8"))
+    web_lock = json.loads((root / "web" / "package-lock.json").read_text(encoding="utf-8"))
+
+    expected = project["project"]["version"]
+    assert expected == pagetrace.__version__
+    assert web_package["version"] == expected
+    assert web_lock["version"] == expected
+    assert web_lock["packages"][""]["version"] == expected
 
 
 def test_typing_marker_is_packaged() -> None:

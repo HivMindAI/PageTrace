@@ -13,8 +13,10 @@ validated evaluation objects, structured human rubrics, quality gates, and regre
 Milestone 8 adds a bounded durable local job queue and authenticated loopback HTTP boundary.
 Milestone 9 adds a packaged same-origin evidence inspection interface. Milestone 10 adds HTTP
 authority/timeout hardening, retained-data quotas and bounded deletion, dependency
-maintenance/auditing, and deployment/incident runbooks. None of these stages provides complete
-document sandboxing or a hardened multi-tenant service.
+maintenance/auditing, and deployment/incident runbooks. Milestone 11 adds a synthetic,
+digest-indexed portfolio demonstration and a constrained tag-build process without processing or
+publishing private user documents. None of these stages provides complete document sandboxing or a
+hardened multi-tenant service.
 
 ## Implemented Milestone 1 protections
 

@@ -7,8 +7,16 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-19
+
 ### Added
 
+- Milestone 11 atomic `portfolio-demo` workflow with a deterministic two-page PDF, complete
+  document-to-evidence processing, exact cited answer, explicit no-hit abstention, canonical
+  retrieval/quality outputs, file digests, and machine-readable claim limitations.
+- A constrained v1.0 reference environment, reproduction/portfolio/release guides, synchronized
+  package and web metadata, and a tag-only workflow that audits and verifies the project,
+  reproduces evidence twice, builds distributions, and uploads a checksummed review bundle.
 - Milestone 10 backend hardening with exact loopback Host/Origin validation, duplicate-authority
   rejection, bounded stalled-connection handling, stronger same-origin response headers, and
   adversarial HTTP tests.
@@ -73,7 +81,7 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 - Typed OCR page/pixel/line/character limits, candidates-only routing option, CLI/Python APIs, and
   exact-match/CER/WER evaluation without hidden text normalization.
 - Initial `src/`-layout Python package with a PEP 561 typing marker.
-- Standards-based Hatchling packaging metadata for development version `0.1.0.dev0`.
+- Standards-based Hatchling packaging metadata for version `1.0.0`.
 - Ruff, strict mypy, pytest, branch coverage, build, and distribution validation configuration.
 - GitHub Actions checks for Python 3.11 and 3.12 plus clean-wheel import validation.
 - Project, contribution, security, roadmap, licensing, and repository support documentation.
