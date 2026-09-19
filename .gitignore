@@ -21,6 +21,8 @@ htmlcov/
 # Packaging output
 build/
 dist/
+!src/pagetrace/web/dist/
+!src/pagetrace/web/dist/**
 *.egg-info/
 
 # Editors and operating systems
@@ -28,4 +30,7 @@ dist/
 .vscode/
 .DS_Store
 Thumbs.db
-
+web/node_modules/
+web/coverage/
+web/*.tsbuildinfo
+.vite/

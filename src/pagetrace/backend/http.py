@@ -6,8 +6,10 @@ import hmac
 import json
 import logging
 import re
+import stat
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any, cast
 from urllib.parse import parse_qs, urlsplit
 
@@ -31,7 +33,30 @@ from pagetrace.backend.service import BackendService
 _JOB_PATH = re.compile(r"^/v1/jobs/(job-[0-9a-f]{32})$")
 _EVENT_PATH = re.compile(r"^/v1/jobs/(job-[0-9a-f]{32})/events$")
 _CANCEL_PATH = re.compile(r"^/v1/jobs/(job-[0-9a-f]{32})/cancel$")
+_STATIC_PATH = re.compile(r"^/assets/[A-Za-z0-9._-]+$")
+_STATIC_MEDIA_TYPES = {
+    ".css": "text/css; charset=utf-8",
+    ".html": "text/html; charset=utf-8",
+    ".ico": "image/x-icon",
+    ".js": "text/javascript; charset=utf-8",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".woff2": "font/woff2",
+}
+_MAX_STATIC_BYTES = 10 * 1024 * 1024
+_CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+    "connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; "
+    "form-action 'self'"
+)
 _LOG = logging.getLogger(__name__)
+
+
+class _LoopbackHTTPServer(ThreadingHTTPServer):
+    """Threaded local server with enough backlog for rapid browser API polling."""
+
+    daemon_threads = True
+    request_queue_size = 128
 
 
 def create_http_server(
@@ -41,6 +66,7 @@ def create_http_server(
     port: int,
     bearer_token: str,
     max_request_bytes: int | None = None,
+    web_root: Path | None = None,
 ) -> ThreadingHTTPServer:
     """Create a loopback-only authenticated server without starting it."""
 
@@ -59,14 +85,17 @@ def create_http_server(
     )
     if isinstance(body_limit, bool) or not isinstance(body_limit, int) or body_limit < 1:
         raise ValueError("max_request_bytes must be a positive integer")
-    handler = _handler_type(service, bearer_token.encode(), body_limit)
-    server = ThreadingHTTPServer((host, port), handler)
-    server.daemon_threads = True
+    static_root = _validate_web_root(web_root)
+    handler = _handler_type(service, bearer_token.encode(), body_limit, static_root)
+    server = _LoopbackHTTPServer((host, port), handler)
     return server
 
 
 def _handler_type(
-    service: BackendService, bearer_token: bytes, max_request_bytes: int
+    service: BackendService,
+    bearer_token: bytes,
+    max_request_bytes: int,
+    web_root: Path | None,
 ) -> type[BaseHTTPRequestHandler]:
     class BackendRequestHandler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -75,6 +104,9 @@ def _handler_type(
 
         def do_GET(self) -> None:
             self._dispatch("GET")
+
+        def do_HEAD(self) -> None:
+            self._dispatch("HEAD")
 
         def do_POST(self) -> None:
             self._dispatch("POST")
@@ -104,6 +136,12 @@ def _handler_type(
                 parsed = urlsplit(self.path)
                 if parsed.fragment:
                     raise BackendInputError("request target is invalid")
+                if (
+                    method in {"GET", "HEAD"}
+                    and not parsed.query
+                    and self._serve_static(parsed.path, head_only=method == "HEAD")
+                ):
+                    return
                 if method == "GET" and parsed.path == "/healthz" and not parsed.query:
                     self._send(HTTPStatus.OK, {"status": "ok"})
                     return
@@ -207,6 +245,60 @@ def _handler_type(
                 {"error": {"code": "not_found", "message": "resource was not found"}},
             )
 
+        def _serve_static(self, path: str, *, head_only: bool) -> bool:
+            if web_root is None:
+                return False
+            if path in {"/", "/index.html"}:
+                relative = Path("index.html")
+            elif _STATIC_PATH.fullmatch(path) is not None:
+                relative = Path(*path.lstrip("/").split("/"))
+            else:
+                return False
+            try:
+                candidate = _safe_static_file(web_root, relative)
+                metadata = candidate.stat()
+                if metadata.st_size > _MAX_STATIC_BYTES:
+                    raise OSError("static asset is too large")
+                body = candidate.read_bytes()
+                if len(body) != metadata.st_size:
+                    raise OSError("static asset changed while reading")
+            except (OSError, ValueError):
+                self._send(
+                    HTTPStatus.NOT_FOUND,
+                    {"error": {"code": "not_found", "message": "resource was not found"}},
+                )
+                return True
+            media_type = _STATIC_MEDIA_TYPES.get(candidate.suffix.lower())
+            if media_type is None:
+                self._send(
+                    HTTPStatus.NOT_FOUND,
+                    {"error": {"code": "not_found", "message": "resource was not found"}},
+                )
+                return True
+            self.close_connection = True
+            self.send_response(HTTPStatus.OK.value)
+            self.send_header("Content-Type", media_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header(
+                "Cache-Control",
+                "no-store"
+                if candidate.name == "index.html"
+                else "public, max-age=31536000, immutable",
+            )
+            self.send_header("Connection", "close")
+            self.send_header("Content-Security-Policy", _CONTENT_SECURITY_POLICY)
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header(
+                "Permissions-Policy",
+                "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
+            )
+            self.end_headers()
+            if not head_only:
+                self.wfile.write(body)
+            return True
+
         def _authenticated(self) -> bool:
             values = self.headers.get_all("Authorization", [])
             if len(values) != 1:
@@ -273,7 +365,7 @@ def _handler_type(
             self._send(
                 HTTPStatus.METHOD_NOT_ALLOWED,
                 {"error": {"code": "method_not_allowed", "message": "method is not allowed"}},
-                allow="GET, POST",
+                allow="GET, HEAD, POST",
             )
 
         def _send_backend_error(self, error: BackendError) -> None:
@@ -310,6 +402,7 @@ def _handler_type(
             self.send_header("Cache-Control", "no-store")
             self.send_header("Connection", "close")
             self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
             if authenticate:
                 self.send_header("WWW-Authenticate", 'Bearer realm="pagetrace"')
             if allow is not None:
@@ -318,6 +411,45 @@ def _handler_type(
             self.wfile.write(body)
 
     return BackendRequestHandler
+
+
+def _validate_web_root(web_root: Path | None) -> Path | None:
+    if web_root is None:
+        return None
+    if not isinstance(web_root, Path):
+        raise ValueError("web root must be a pathlib.Path")
+    try:
+        metadata = web_root.lstat()
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+            raise ValueError("web root must be a non-symlink directory")
+        resolved = web_root.resolve(strict=True)
+        _safe_static_file(resolved, Path("index.html"))
+        return resolved
+    except ValueError:
+        raise
+    except OSError as exc:
+        raise ValueError("web root must contain a readable regular index.html") from exc
+
+
+def _safe_static_file(root: Path, relative: Path) -> Path:
+    if (
+        relative.is_absolute()
+        or not relative.parts
+        or any(part in {"", ".", ".."} for part in relative.parts)
+    ):
+        raise ValueError("static asset path is unsafe")
+    current = root
+    for part in relative.parts:
+        current = current / part
+        metadata = current.lstat()
+        if stat.S_ISLNK(metadata.st_mode):
+            raise ValueError("static asset path contains a symbolic link")
+    if not stat.S_ISREG(current.lstat().st_mode):
+        raise ValueError("static asset must be a regular file")
+    resolved = current.resolve(strict=True)
+    if not resolved.is_relative_to(root):
+        raise ValueError("static asset is outside the web root")
+    return resolved
 
 
 def _reject_constant(value: str) -> Any:

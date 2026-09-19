@@ -10,6 +10,33 @@ permissions:
   contents: read
 
 jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install locked frontend dependencies
+        run: npm ci
+      - name: Lint frontend
+        run: npm run lint
+      - name: Test frontend
+        run: npm test
+      - name: Build frontend
+        run: npm run build
+      - name: Verify packaged assets are current
+        working-directory: .
+        run: git diff --exit-code -- src/pagetrace/web/dist
+
   quality:
     name: Quality
     runs-on: ubuntu-latest
@@ -91,6 +118,8 @@ jobs:
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" answer --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace" evaluate-quality --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/pagetrace-backend" --help
+          "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -c \
+            "from importlib import resources; assert resources.files('pagetrace.web').joinpath('dist/index.html').is_file()"
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace extract-text --help
           "${RUNNER_TEMP}/pagetrace-wheel/bin/python" -I -m pagetrace ocr --help

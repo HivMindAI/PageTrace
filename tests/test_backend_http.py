@@ -71,6 +71,24 @@ def _request(
     return status, payload, response_headers
 
 
+def _raw_request(
+    server: ThreadingHTTPServer,
+    method: str,
+    path: str,
+    *,
+    authenticated: bool = False,
+) -> tuple[int, bytes, http.client.HTTPMessage]:
+    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+    headers = {"Authorization": f"Bearer {_TOKEN}"} if authenticated else {}
+    connection.request(method, path, headers=headers)
+    response = connection.getresponse()
+    body = response.read()
+    status = response.status
+    response_headers = response.headers
+    connection.close()
+    return status, body, response_headers
+
+
 def test_http_health_authentication_and_security_headers(
     backend_server: tuple[ThreadingHTTPServer, BackendService],
 ) -> None:
@@ -162,7 +180,7 @@ def test_http_cancel_and_error_mapping(
     assert status == HTTPStatus.BAD_REQUEST
     status, payload, headers = _request(server, "DELETE", f"/v1/jobs/{job_id}")
     assert status == HTTPStatus.METHOD_NOT_ALLOWED
-    assert headers["Allow"] == "GET, POST"
+    assert headers["Allow"] == "GET, HEAD, POST"
     status, _, _ = _request(server, "GET", "/v1/unknown")
     assert status == HTTPStatus.NOT_FOUND
 
@@ -303,3 +321,105 @@ def test_http_server_configuration_validation(tmp_path: Path) -> None:
             bearer_token=_TOKEN,
             max_request_bytes=0,
         )
+    missing = tmp_path / "missing-web"
+    with pytest.raises(ValueError, match="web root"):
+        create_http_server(
+            service,
+            host="127.0.0.1",
+            port=1,
+            bearer_token=_TOKEN,
+            web_root=missing,
+        )
+
+
+def test_http_serves_packaged_web_assets_with_browser_security_headers(tmp_path: Path) -> None:
+    store = SqliteJobStore(tmp_path / "web.sqlite3")
+    service = BackendService(store, {})
+    service.initialize()
+    web_root = tmp_path / "web"
+    assets = web_root / "assets"
+    assets.mkdir(parents=True)
+    (web_root / "index.html").write_text(
+        "<!doctype html><title>PageTrace</title>", encoding="utf-8"
+    )
+    (assets / "app-abc123.js").write_text("console.log('PageTrace')", encoding="utf-8")
+    server = create_http_server(
+        service,
+        host="127.0.0.1",
+        port=0,
+        bearer_token=_TOKEN,
+        web_root=web_root,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        status, body, headers = _raw_request(server, "GET", "/")
+        assert status == HTTPStatus.OK
+        assert b"PageTrace" in body
+        assert headers["Content-Type"] == "text/html; charset=utf-8"
+        assert headers["Cache-Control"] == "no-store"
+        assert headers["Content-Security-Policy"].startswith("default-src 'self'")
+        assert headers["X-Frame-Options"] == "DENY"
+        assert headers["Referrer-Policy"] == "no-referrer"
+        assert "camera=()" in headers["Permissions-Policy"]
+
+        status, body, headers = _raw_request(server, "HEAD", "/index.html")
+        assert status == HTTPStatus.OK
+        assert body == b""
+        assert int(headers["Content-Length"]) > 0
+
+        status, body, headers = _raw_request(server, "GET", "/assets/app-abc123.js")
+        assert status == HTTPStatus.OK
+        assert body == b"console.log('PageTrace')"
+        assert headers["Content-Type"] == "text/javascript; charset=utf-8"
+        assert headers["Cache-Control"] == "public, max-age=31536000, immutable"
+
+        status, payload, _ = _request(
+            server, "GET", "/assets/missing.js", authenticated=False, content_type=None
+        )
+        assert status == HTTPStatus.NOT_FOUND
+        assert payload["error"] == {"code": "not_found", "message": "resource was not found"}
+        status, _, _ = _request(
+            server, "GET", "/assets/../index.html", authenticated=False, content_type=None
+        )
+        assert status == HTTPStatus.UNAUTHORIZED
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_http_rejects_symlinked_static_asset(tmp_path: Path) -> None:
+    store = SqliteJobStore(tmp_path / "web-symlink.sqlite3")
+    service = BackendService(store, {})
+    service.initialize()
+    web_root = tmp_path / "web"
+    assets = web_root / "assets"
+    assets.mkdir(parents=True)
+    (web_root / "index.html").write_text("PageTrace", encoding="utf-8")
+    target = tmp_path / "outside.js"
+    target.write_text("secret", encoding="utf-8")
+    link = assets / "linked.js"
+    try:
+        link.symlink_to(target)
+    except OSError:
+        pytest.skip("symbolic links are not available")
+    server = create_http_server(
+        service,
+        host="127.0.0.1",
+        port=0,
+        bearer_token=_TOKEN,
+        web_root=web_root,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        status, payload, _ = _request(
+            server, "GET", "/assets/linked.js", authenticated=False, content_type=None
+        )
+        assert status == HTTPStatus.NOT_FOUND
+        assert payload["error"]["code"] == "not_found"  # type: ignore[index]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

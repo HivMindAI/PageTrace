@@ -103,10 +103,20 @@ evidence-grounded QA, and quality evaluation behind an authenticated loopback-on
 separate operator CLI. This is a single-host application boundary, not a production deployment or
 process sandbox, and remains subject to milestone review and acceptance.
 
-## Milestone 9 — Evidence-first Web Product
+## Milestone 9 — Evidence-first Web Product (implementation pending acceptance)
 
 Build a web experience centered on inspecting sources, navigating evidence, understanding system
 uncertainty, and correcting failures.
+
+The current implementation packages a responsive TypeScript evidence desk with the backend. It
+starts ingestion, evidence-answer, and quality-evaluation workflows; follows durable job snapshots
+and ordered events; supports cancellation and known-job reopening; and renders source identities,
+page geometry, exact citation slices, retrieval candidates, lexical coverage, abstention reasons,
+quality gates, regressions, findings, and aggregate system counters. Authentication is memory-only
+in the browser. Static assets are served from loopback with strict path handling, a restrictive
+content security policy, anti-framing and MIME-sniffing protections, and immutable caching only for
+fingerprinted assets. This remains a single-host inspection product, not a multi-user deployment,
+and is subject to milestone review and acceptance.
 
 ## Milestone 10 — Production & Security Hardening
 

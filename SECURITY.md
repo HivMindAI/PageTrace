@@ -10,8 +10,9 @@ introducing another parser or model. Milestone 5 adds bounded in-process lexical
 binary relevance evaluation. Milestone 6 adds local deterministic extractive QA with structural
 evidence enforcement and explicit abstention. Milestone 7 adds bounded local aggregation of
 validated evaluation objects, structured human rubrics, quality gates, and regression checks.
-Milestone 8 adds a bounded durable local job queue and authenticated loopback HTTP boundary. None
-of these stages provides complete document sandboxing or a hardened multi-tenant service.
+Milestone 8 adds a bounded durable local job queue and authenticated loopback HTTP boundary.
+Milestone 9 adds a packaged same-origin evidence inspection interface. None of these stages
+provides complete document sandboxing or a hardened multi-tenant service.
 
 ## Implemented Milestone 1 protections
 
@@ -221,6 +222,32 @@ Running cancellation is cooperative at the handler boundary and cannot preempt a
 parser or computation. Startup recovery assumes one coordinated application instance; the current
 schema does not provide distributed worker leases or heartbeats.
 
+## Implemented Milestone 9 protections
+
+- The browser application and API are served from the same loopback origin, so no cross-origin API
+  permission is enabled. `/v1` routes retain the Milestone 8 bearer requirement.
+- The bearer token is held only in JavaScript memory. The application does not place it in a URL,
+  cookie, local storage, session storage, IndexedDB, logs, or rendered job metadata.
+- Backend, document, answer, citation, finding, and event values are assigned through DOM text
+  nodes. They are not inserted as HTML and cannot create executable markup in the interface.
+- Static routing recognizes only `/`, `/index.html`, and generated single-segment `/assets/`
+  names. Files must be bounded regular non-symlinks that resolve inside the configured web root.
+- HTML disables caching; fingerprinted assets use immutable caching. Every web response disables
+  MIME sniffing and referrer disclosure, blocks framing, limits browser capabilities, and applies a
+  content security policy restricted to the same origin with objects and base URLs disabled.
+- Evidence views keep exact citation offsets, chunk/page identity, retrieval rank, bounding-region
+  coordinates, matched terms, and lexical coverage visible. Abstention is displayed explicitly,
+  and coverage is described as lexical rather than a truth or completeness score.
+- The interface stores recent job IDs only in the live page session. Reopening work requires a
+  known canonical job ID; no unauthenticated or global job-list endpoint was added.
+
+The frontend is not an authorization boundary. Any process or person holding the backend token can
+read every retained job result exposed by that backend, and browser extensions, local malware, or a
+compromised host may observe the token and displayed evidence. The built-in server still lacks TLS,
+accounts, per-user authorization, rate limits, CSRF tokens, remote deployment hardening, and data
+retention controls. Operators must keep it on loopback and protect the host, token, SQLite database,
+artifact store, browser profile, and screen contents.
+
 ## Security principles
 
 - Treat every document and all extracted content as untrusted data.
@@ -233,7 +260,7 @@ schema does not provide distributed worker leases or heartbeats.
 
 ## Residual risks and future security work
 
-Milestones 1 through 8 are in-process processing boundaries, not operating-system sandboxes.
+Milestones 1 through 9 are in-process processing boundaries, not operating-system sandboxes.
 Residual risks include vulnerabilities or pathological CPU/memory behavior in pypdf and
 pdfplumber text/content-stream/layout parsing, Pillow, Python, or native image codecs; very large
 decompressed text streams; deeply nested PDF object graphs; filesystem exhaustion; storage-root

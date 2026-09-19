@@ -9,6 +9,15 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 
 ### Added
 
+- Milestone 9 responsive TypeScript Evidence Desk for document intake, evidence-grounded questions,
+  quality evaluation, durable job/event inspection, cancellation, known-job reopening, and
+  operational counters.
+- Evidence-focused result views for document/page identity, exact citation slices, retrieval ranks,
+  source coordinates, lexical coverage and abstention, quality metrics, gates, regressions, and
+  findings, with memory-only bearer authentication and safe text rendering.
+- Packaged same-origin frontend delivery with strict static path/symlink checks, bounded assets,
+  CSP, anti-framing, MIME-sniffing/referrer/permissions controls, immutable fingerprinted assets,
+  frontend lint/tests/build, and clean-wheel asset verification.
 - Milestone 8 standard-library product backend with a durable SQLite job queue, canonical request
   fingerprints, idempotent submission, bounded retries/results/events, cancellation, interrupted-job
   recovery, and append-only lifecycle history.

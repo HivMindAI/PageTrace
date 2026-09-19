@@ -15,6 +15,7 @@ from pagetrace.backend.http import create_http_server
 from pagetrace.backend.service import BackendService, BackgroundWorker
 from pagetrace.backend.store import SqliteJobStore
 from pagetrace.backend.workflows import workflow_handlers
+from pagetrace.web import default_web_root
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -33,7 +34,9 @@ def build_parser() -> argparse.ArgumentParser:
     worker.add_argument("--once", action="store_true", help="process at most one queued job")
     worker.add_argument("--poll-interval", type=_poll_interval, default=0.25)
 
-    serve = subparsers.add_parser("serve", help="serve the authenticated loopback JSON API")
+    serve = subparsers.add_parser(
+        "serve", help="serve the web app and authenticated loopback JSON API"
+    )
     serve.add_argument("--host", default="127.0.0.1", choices=("127.0.0.1", "::1", "localhost"))
     serve.add_argument("--port", type=_port, default=8765)
     serve.add_argument(
@@ -42,6 +45,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="environment variable containing the bearer token",
     )
     serve.add_argument("--no-worker", action="store_true")
+    serve.add_argument(
+        "--web-root",
+        type=Path,
+        default=default_web_root(),
+        help="directory containing the built PageTrace web application",
+    )
     serve.add_argument("--poll-interval", type=_poll_interval, default=0.25)
     return parser
 
@@ -107,6 +116,7 @@ def _serve(service: BackendService, arguments: argparse.Namespace) -> int:
         host=arguments.host,
         port=arguments.port,
         bearer_token=token,
+        web_root=arguments.web_root,
     )
     worker = None
     if not arguments.no_worker:
@@ -114,7 +124,7 @@ def _serve(service: BackendService, arguments: argparse.Namespace) -> int:
         worker.start()
     worker_stopped = True
     try:
-        print(f"PageTrace backend listening on {arguments.host}:{server.server_port}")
+        print(f"PageTrace web app listening on http://{arguments.host}:{server.server_port}")
         server.serve_forever(poll_interval=0.25)
     except KeyboardInterrupt:
         pass

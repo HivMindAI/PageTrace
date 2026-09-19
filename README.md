@@ -19,8 +19,8 @@ PageTrace is guided by four ideas:
 PageTrace is **pre-alpha**. Milestones 0, 1, and 2A are complete. Milestone 2B routed OCR,
 Milestone 3 structured representation, Milestone 4 provenance-aware corpus construction,
 Milestone 5 retrieval baselines/evaluation, Milestone 6 evidence-grounded QA, Milestone 7
-consolidated quality evaluation, and Milestone 8 product backend are implemented and pending
-acceptance. The current package can:
+consolidated quality evaluation, Milestone 8 product backend, and Milestone 9 evidence-first web
+product are implemented and pending acceptance. The current package can:
 
 - stage untrusted local PDF, PNG, and JPEG files under explicit byte/page/pixel limits;
 - identify supported media from content signatures and confirm it with pypdf or Pillow;
@@ -53,7 +53,9 @@ acceptance. The current package can:
 - durably queue bounded ingestion, QA, and quality workflows with idempotency, retries,
   cancellation, recovery, lifecycle events, and persistent operational counts;
 - expose those workflows through an authenticated loopback JSON API and a separate background
-  worker/operator CLI; and
+  worker/operator CLI;
+- inspect source identity, page geometry, exact citations, retrieval context, abstention, quality
+  findings, durable activity, and system counters in a packaged evidence-first web interface; and
 - apply explicit quality gates and directional baseline-regression rules with CI-friendly status
   codes.
 
@@ -89,7 +91,7 @@ cross-stage metrics, human rubrics, gates, and regressions (Milestone 7 pending 
         |
 durable authenticated product backend (Milestone 8 pending acceptance)
         |
-evidence-first web product (planned)
+evidence-first web product (Milestone 9 pending acceptance)
 ```
 
 See [ROADMAP.md](ROADMAP.md) for milestone scope boundaries.
@@ -484,6 +486,12 @@ pagetrace-backend --database .pagetrace/backend.sqlite3 worker
 pagetrace-backend --database .pagetrace/backend.sqlite3 serve
 ```
 
+Open `http://127.0.0.1:8765/` and enter the same bearer token. The Evidence Desk keeps that token
+only in page memory. It does not use cookies, local storage, or session storage. Ingestion accepts a
+path under the backend's configured `--input-root`; browsers do not upload source bytes. The web
+product can start all three built-in workflows, follow their durable state and ordered events,
+cancel active work, reopen a known job ID, and inspect canonical results and provenance.
+
 Authenticated routes are `POST /v1/jobs`, `GET /v1/jobs/{job_id}`,
 `GET /v1/jobs/{job_id}/events`, `POST /v1/jobs/{job_id}/cancel`, and
 `GET /v1/metrics`. `GET /healthz` and `GET /readyz` expose status only. A submission body has the
@@ -506,6 +514,12 @@ workflow fields are rejected rather than ignored.
 The HTTP boundary is deliberately single-host and standard-library based. Put a separately
 hardened TLS reverse proxy in front of it if another local application needs access; do not expose
 the built-in server directly to an untrusted network.
+
+The packaged web assets are public so the login screen can load, while all `/v1` data routes remain
+bearer-authenticated. The server accepts only its generated asset-name pattern, rejects symlinked or
+out-of-root files, caps asset size, sends a restrictive content security policy, blocks framing and
+MIME sniffing, and disables caching for HTML. Fingerprinted JavaScript and CSS receive immutable
+caching. Evidence text is inserted as text content rather than interpreted as markup.
 
 ## Security boundary and limits
 

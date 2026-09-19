@@ -114,7 +114,7 @@ def test_backend_cli_serve_lifecycle(
         )
         == 0
     )
-    assert capsys.readouterr().out == "PageTrace backend listening on 127.0.0.1:4321\n"
+    assert capsys.readouterr().out == "PageTrace web app listening on http://127.0.0.1:4321\n"
     assert calls == ["server", "worker:0.5", "start", "serve:0.25", "close", "stop:30.0"]
 
 

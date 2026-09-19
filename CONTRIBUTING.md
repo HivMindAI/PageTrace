@@ -18,6 +18,11 @@ python -m venv .venv
 # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev,ocr,structure]"
+
+# Frontend toolchain (Node.js 22 or newer)
+cd web
+npm ci
+cd ..
 ```
 
 The editable installation is required so tests import the installed `src/` package rather than
@@ -35,6 +40,12 @@ pytest
 python -m build
 python -m twine check --strict dist/*
 git diff --check
+cd web
+npm run lint
+npm test
+npm run build
+cd ..
+git diff --exit-code -- src/pagetrace/web/dist
 ```
 
 Use `ruff format .` to apply formatting. Do not weaken lint, typing, test, or coverage gates merely
@@ -43,6 +54,10 @@ exception.
 
 `pytest` includes branch coverage and fails below 90%. Behavior changes must include focused tests
 that demonstrate the intended result and meaningful failure cases.
+
+Frontend changes must keep the TypeScript client strict, render backend/document values as text,
+avoid persistent token storage, and commit the production build under `src/pagetrace/web/dist` so
+the Python wheel remains directly runnable. `npm run build` must leave those packaged assets clean.
 
 ## Clean-wheel smoke test
 
