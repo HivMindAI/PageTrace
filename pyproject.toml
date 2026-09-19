@@ -23,7 +23,7 @@ classifiers = [
 ]
 dependencies = [
   "Pillow>=11,<13",
-  "pypdf>=6,<7",
+  "pypdf>=6.18.1,<7",
 ]
 
 [project.scripts]
