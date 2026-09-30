@@ -7,6 +7,12 @@ intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) whe
 
 ## [Unreleased]
 
+### Documentation
+
+- Updated the project status and installation guidance for the published v1.0.1 GitHub release.
+- Added the planned Milestone 12 real-document evaluation and reliability scope, phased execution
+  plan, privacy rules, and measurable acceptance criteria.
+
 ## [1.0.1] - 2026-09-19
 
 ### Changed

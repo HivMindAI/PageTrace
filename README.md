@@ -16,7 +16,7 @@ PageTrace is guided by four ideas:
 
 ## Current status
 
-PageTrace is a **v1.0 portfolio release candidate**. Milestones 0 through 11 are implemented and
+PageTrace **v1.0.1 is a published portfolio release**. Milestones 0 through 11 are implemented and
 accepted within their documented scope. Version 1.0 describes the portfolio/API milestone, not a
 claim that the local service is suitable for remote or multi-user production deployment. The
 current package can:
@@ -101,6 +101,24 @@ reproducible evidence-backed portfolio (Milestone 11 complete)
 
 See [ROADMAP.md](ROADMAP.md) for milestone scope boundaries and
 [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) for the v1.0 acceptance record.
+
+Milestone 12 is planned around representative real-document evaluation and reliability work. Its
+scope and acceptance requirements are documented in the
+[Milestone 12 plan](docs/MILESTONE_12.md).
+
+## Published release
+
+Download the verified wheel, source distribution, and `SHA256SUMS` from the
+[PageTrace v1.0.1 release](https://github.com/HivMindAI/PageTrace/releases/tag/v1.0.1). Verify the
+downloaded distribution before installation:
+
+```bash
+sha256sum --check SHA256SUMS
+python -m pip install pagetrace-1.0.1-py3-none-any.whl
+```
+
+On Windows PowerShell, use `Get-FileHash -Algorithm SHA256` and compare the result with
+`SHA256SUMS`.
 
 ## Development setup
 

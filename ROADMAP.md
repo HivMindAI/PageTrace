@@ -5,7 +5,8 @@ claims of released functionality.
 
 Milestones 0 through 11 have completed implementation and acceptance review. The scoped evidence
 and retained limitations for Milestones 2B through 11 are recorded in
-[`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md). Release publication remains a separate, explicit step.
+[`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md). Version 1.0.1 is published as the first public portfolio
+release. Milestone 12 is planned and is not yet an accepted capability.
 
 ## Milestone 0 — Project Foundation (complete)
 
@@ -155,3 +156,46 @@ manifest twice, run the full validation matrix, build distributions, and retain 
 candidate bundle for manual review. The synthetic fixture proves reproducibility and traceability,
 not general document accuracy or remote-production readiness. The implementation is accepted
 within these stated boundaries.
+
+## Milestone 12 — Real-World Evaluation & Reliability (planned)
+
+Measure the existing deterministic pipeline on a representative, legally usable document corpus
+before expanding retrieval or introducing model-assisted answers. The milestone will establish
+where ingestion, OCR, structure extraction, retrieval, extractive QA, provenance, and resource
+behavior fail on real documents, then turn confirmed failures into durable regression coverage.
+
+The work is divided into three evidence-producing phases:
+
+1. **Corpus and labels:** create a versioned benchmark manifest spanning born-digital PDFs, scans,
+   photographed pages, multi-column layouts, table-heavy documents, and degraded or rotated pages.
+   Record content digests, redistribution/privacy status, document characteristics, and available
+   OCR, retrieval, answer, and citation ground truth without committing restricted documents.
+2. **Frozen baseline:** run the released pipeline with exact configuration and dependency
+   provenance; report cohort-level ingestion outcomes, OCR CER/WER, retrieval metrics, QA and
+   citation judgments, abstention behavior, failures, and observational resource measurements.
+3. **Reliability improvements:** prioritize measured failure classes, add minimal reproductions,
+   rerun the unchanged benchmark, and apply predeclared quality and regression gates.
+
+Milestone 12 is complete only when all of the following are true:
+
+- the benchmark includes at least 30 documents and every named cohort contains at least five;
+- OCR ground truth covers at least 50 representative pages, and retrieval/QA evaluation contains
+  at least 60 independently labeled questions;
+- every included document has an explicit license, redistribution decision, or local-only privacy
+  classification, and reports exclude source content that is not approved for disclosure;
+- one command produces a machine-readable manifest, per-case results, aggregate/cohort metrics,
+  failure taxonomy, environment record, and human-readable summary;
+- baseline thresholds are declared before reliability changes are evaluated, with missing samples
+  reported as incomplete rather than silently skipped;
+- all answered cases retain exact, mechanically verifiable source citations, and the benchmark
+  reports answer correctness separately from citation validity;
+- confirmed regressions fail CI while observational runtime and memory measurements remain clearly
+  separated from deterministic quality gates; and
+- the acceptance record states the tested corpus boundaries and makes no claim of general document
+  accuracy, language coverage, or production isolation.
+
+Persistent/vector indexes, hybrid retrieval, semantic table interpretation, language models, and
+vision-language models are outside this milestone. They should be considered only after the
+baseline identifies a measured need and supplies an evaluation capable of detecting regressions.
+
+See [`docs/MILESTONE_12.md`](docs/MILESTONE_12.md) for the execution plan and artifact contract.
