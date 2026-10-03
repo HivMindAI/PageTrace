@@ -7,6 +7,12 @@ name = "pagetrace"
 version = "1.0.1"
 description = "Deterministic document processing, evidence-grounded QA, and quality evaluation."
 readme = "README.md"
+authors = [
+  { name = "Asadullah Hussaini", email = "219711075+HivMindAI@users.noreply.github.com" },
+]
+maintainers = [
+  { name = "Asadullah Hussaini", email = "219711075+HivMindAI@users.noreply.github.com" },
+]
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]

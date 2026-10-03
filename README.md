@@ -662,6 +662,10 @@ clean-wheel import and CLI smoke tests used by continuous integration.
 - [docs/PORTFOLIO.md](docs/PORTFOLIO.md) — reproducible evidence demonstration and claim limits
 - [docs/RELEASING.md](docs/RELEASING.md) — tagged candidate verification and release checklist
 
+## Author / Maintainer
+
+Asadullah Hussaini ([@HivMindAI](https://github.com/HivMindAI)) — Project owner and primary developer/maintainer.
+
 ## License
 
 PageTrace is available under the [MIT License](LICENSE).
