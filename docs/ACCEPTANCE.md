@@ -11,9 +11,9 @@ limitations into supported features or make unmeasured accuracy, security, or de
 - Reviewed baseline: `30d150341e0f10245791ae9e626c6ccf9d10b3e5`
 - Scope: Milestones 2B through 11; Milestones 0, 1, and 2A were already complete
 - Decision: accepted for the PageTrace v1.0 portfolio release candidate
-- Release state: the `v1.0.0` candidate tag was blocked by frontend dependency audit findings;
-  no release was published, and the corrected `v1.0.1` candidate has passed local validation and
-  is pending its immutable tagged workflow
+- Release state: the `v1.0.0` candidate tag was blocked by frontend dependency audit findings and
+  was not published. The corrected `v1.0.1` tagged workflow completed successfully, and PageTrace
+  `v1.0.1` was published as a GitHub Release.
 
 ## Accepted evidence
 

@@ -340,8 +340,8 @@ recovery remain later responsibilities.
 
 ## Supported versions
 
-PageTrace has no public release yet. Security fixes currently target the active development branch.
-A supported-version table will be added when releases begin.
+PageTrace v1.0.1 is the current public release. Security fixes currently target the active
+development branch.
 
 ## Reporting a vulnerability
 
