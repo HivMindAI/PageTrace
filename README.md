@@ -153,6 +153,24 @@ writes canonical evidence, evaluation, quality, digest, and limitation records. 
 one exact source-cited answer and one correct no-evidence abstention. See the
 [v1.0 portfolio guide](docs/PORTFOLIO.md) for reproduction and claim boundaries.
 
+## Visual evidence
+
+**Document intake** — Successful ingestion with verified SHA-256 identity and page metadata.
+
+![Document intake with verified document identity and page metadata](docs/assets/screenshots/01-document-intake.png)
+
+**Evidence-grounded answer** — Extractive answer backed by cited source slices.
+
+![Evidence-grounded extractive answer with cited source slices](docs/assets/screenshots/02-evidence-answer.png)
+
+**Explicit abstention** — PageTrace refuses to answer when no retrieval evidence passes the
+configured threshold.
+
+![Explicit abstention when no retrieval evidence passes the threshold](docs/assets/screenshots/03-explicit-abstention.png)
+
+These screenshots were captured from PageTrace `v1.0.1` using the deterministic synthetic
+portfolio fixture and do not demonstrate general real-world accuracy.
+
 ## Python API
 
 ```python
