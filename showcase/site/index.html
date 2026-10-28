@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Explore PageTrace's evidence-first approach to document intelligence with a safe, interactive, static Evidence Desk demonstration.">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="theme-color" content="#102c40">
+  <title>PageTrace — Evidence Desk / Public Demo</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="app-shell">
+    <aside class="rail">
+      <a class="brand" href="#overview" aria-label="PageTrace overview">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span><b>PageTrace</b><small>Evidence Desk</small></span>
+      </a>
+      <div class="rail-label">Public demonstration</div>
+      <nav class="primary-nav" aria-label="Main navigation">
+        <a class="nav-item" href="#overview"><span aria-hidden="true">◫</span> Overview <small>01</small></a>
+        <a class="nav-item" href="#desk"><span aria-hidden="true">⌕</span> Evidence Desk <small>02</small></a>
+        <a class="nav-item" href="#architecture"><span aria-hidden="true">⌘</span> Architecture <small>03</small></a>
+      </nav>
+      <div class="rail-links">
+        <a href="https://github.com/HivMindAI/PageTrace" target="_blank" rel="noopener noreferrer">View on GitHub <span aria-hidden="true">↗</span></a>
+        <a data-doc="docs/PORTFOLIO.md" href="https://github.com/HivMindAI/PageTrace/blob/0de8da3556406c0b12d135fce806d1936e3cd9f6/docs/PORTFOLIO.md" target="_blank" rel="noopener noreferrer">Read the portfolio <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="rail-note"><span class="eyebrow">The guiding principle</span><p>Source text is evidence,<br>never an instruction.</p><span class="rail-edition">Open Doors · Project showcase</span></div>
+    </aside>
+
+    <div class="page">
+      <header class="topbar">
+        <div class="breadcrumb">PageTrace <span aria-hidden="true">/</span> <b>Project showcase</b></div>
+        <span class="demo-badge"><span aria-hidden="true"></span> Static demo · browser only</span>
+      </header>
+      <main id="main" tabindex="-1">
+        <section id="overview" class="hero" aria-labelledby="hero-title">
+          <div class="hero-copy">
+            <span class="eyebrow">Document intelligence, with a paper trail</span>
+            <h1 id="hero-title">Every answer should<br>show its <em>work.</em></h1>
+            <p>PageTrace connects document search and extractive answers to inspectable source evidence. Explore the idea, one citation at a time.</p>
+            <div class="hero-actions"><a class="button button-dark" href="#desk">Explore the Evidence Desk <span aria-hidden="true">↓</span></a><a class="text-link" href="#architecture">How the real pipeline works <span aria-hidden="true">↗</span></a></div>
+          </div>
+          <div class="hero-stamp" aria-label="Trace every answer to its source"><span>Evidence first</span><b>↳</b><small>Trace it to the source</small></div>
+          <div class="principles"><span><b>01</b> Exact source excerpts</span><span><b>02</b> Visible provenance</span><span><b>03</b> Explicit abstention</span></div>
+        </section>
+
+        <section id="desk" aria-labelledby="desk-title" class="desk-section">
+          <div class="section-head"><div><span class="eyebrow">02 / Explore the evidence</span><h2 id="desk-title">The Evidence Desk</h2></div><span class="quiet-chip">Two pages. Every word inspectable.</span></div>
+          <div class="demo-notice"><span class="notice-icon" aria-hidden="true">i</span><p><b>A safe, static demonstration.</b> Search runs in your browser on a bundled synthetic fixture. No uploads, Python, OCR, or backend runs here.</p></div>
+          <noscript><p class="noscript">Enable JavaScript to use the interactive desk. The sample PDF, documentation, and architecture remain available below.</p></noscript>
+          <div class="desk-grid">
+            <section class="panel source-panel" aria-labelledby="source-title">
+              <div class="panel-heading"><div class="heading-pair"><span class="step-number">A</span><div><span class="eyebrow">The source</span><h3 id="source-title">Sample document</h3></div></div><span class="tag">Synthetic</span></div>
+              <div class="file-info"><span class="file-icon" aria-hidden="true">PDF</span><div><b>northstar-fy2025.pdf</b><small>Public portfolio fixture · 2 pages</small></div><a class="icon-link" href="./samples/northstar-fy2025.pdf" download aria-label="Download synthetic sample PDF">↓</a></div>
+              <div class="reader-toolbar"><span>Text preview <small>· reformatted</small></span><div class="page-controls" role="group" aria-label="Sample document page"><button type="button" data-page="1" aria-pressed="true">1</button><button type="button" data-page="2" aria-pressed="false">2</button></div></div>
+              <article class="document-page" id="document-page" tabindex="-1" aria-labelledby="preview-title">
+                <div class="document-kicker">Northstar / FY2025</div><h4 id="preview-title">Revenue statement</h4><div class="document-rule"></div>
+                <p id="page-text">Northstar FY2025 revenue was $12.4 million, up 24 percent year over year.</p>
+                <div class="document-footer"><span>Synthetic source text</span><span id="page-number">01 / 02</span></div>
+              </article>
+              <p class="reader-caption">This reading view adds headings and layout. Only the paragraph is source evidence. Download the PDF to inspect the original fixture.</p>
+              <details class="provenance"><summary>Inspect sample provenance <span aria-hidden="true">+</span></summary><dl><dt>Text origin</dt><dd><a data-doc="src/pagetrace/portfolio.py" href="https://github.com/HivMindAI/PageTrace/blob/0de8da3556406c0b12d135fce806d1936e3cd9f6/src/pagetrace/portfolio.py" target="_blank" rel="noopener noreferrer">PORTFOLIO_PAGE_TEXTS ↗</a></dd><dt>Reference</dt><dd id="page-reference">sample-page-1</dd><dt>PDF SHA-256</dt><dd id="source-digest" class="digest">See downloadable provenance record</dd><dt>Source revision</dt><dd class="digest">0de8da3556406c0b12d135fce806d1936e3cd9f6</dd></dl><p>Sample references and character offsets belong to this demo. Python artifact IDs and page geometry are not generated here.</p><a href="./samples/provenance.json" download class="text-link">Download provenance JSON ↓</a></details>
+            </section>
+
+            <section class="panel answer-panel" aria-labelledby="question-title">
+              <div class="panel-heading"><div class="heading-pair"><span class="step-number coral">B</span><div><span class="eyebrow">The question</span><h3 id="question-title">Ask with evidence</h3></div></div><span class="tag">Extractive</span></div>
+              <form id="search-form" class="search-form" novalidate>
+                <label for="question">Search the sample document</label>
+                <div class="search-row"><input id="question" name="question" value="Northstar FY2025 revenue?" maxlength="500" autocomplete="off" spellcheck="false" aria-describedby="search-help input-error" required><button class="button button-dark" type="submit">Search <span aria-hidden="true">→</span></button></div>
+                <p id="search-help" class="field-help">Matches words in the two sample pages. Try a short, specific question.</p>
+                <p id="input-error" class="input-error" role="alert" hidden></p>
+                <div class="example-row"><span>Try</span><button type="button" data-example="0">Revenue</button><button type="button" data-example="1">Operating margin</button><button type="button" data-example="2">Try abstention <span aria-hidden="true">↗</span></button></div>
+                <details class="search-settings"><summary>Evidence settings</summary><label for="coverage">Minimum lexical coverage <select id="coverage"><option value="0.5">50% · portfolio setting</option><option value="1">100% · all query terms</option></select></label><p>One top page, one excerpt. Coverage measures shared query terms; it does not establish truth or semantic support.</p></details>
+              </form>
+              <div id="result" class="result" aria-live="polite" aria-atomic="true"></div>
+            </section>
+          </div>
+          <div class="desk-footnote"><span aria-hidden="true">↳</span><p><b>Follow the citation.</b> An answer is an exact text slice. Select its source link to inspect the highlighted evidence in the sample.</p></div>
+        </section>
+
+        <section id="architecture" class="architecture-section" aria-labelledby="architecture-title">
+          <div class="section-head"><div><span class="eyebrow">03 / Behind the interface</span><h2 id="architecture-title">Built around traceability.</h2></div><a class="text-link" data-doc="README.md" href="https://github.com/HivMindAI/PageTrace/blob/0de8da3556406c0b12d135fce806d1936e3cd9f6/README.md" target="_blank" rel="noopener noreferrer">Explore the repository ↗</a></div>
+          <p class="section-intro">The real Python project carries source identity through each transformation. This static desk illustrates the search and answer experience using public fixture text.</p>
+          <ol class="pipeline" aria-label="Real PageTrace processing pipeline">
+            <li><span>01 / Ingest</span><h3>Bound the input.</h3><p>PDF, PNG, JPEG validation, resource limits, and SHA-256 identity.</p><small>pypdf · Pillow</small></li>
+            <li><span>02 / Extract</span><h3>Read each page.</h3><p>Embedded PDF text first. Route eligible pages to local OCR.</p><small>PDFium · RapidOCR · ONNX</small></li>
+            <li><span>03 / Structure</span><h3>Keep its place.</h3><p>Positioned text, line-based PDF tables, and page-bounded chunks.</p><small>pdfplumber · provenance</small></li>
+            <li><span>04 / Retrieve</span><h3>Find the evidence.</h3><p>Transparent lexical BM25 ranking over verified corpus chunks.</p><small>Unicode tokens · no vector index</small></li>
+            <li><span>05 / Answer</span><h3>Cite or abstain.</h3><p>Exact retrieved excerpts with page, region, and character offsets.</p><small>Extractive · no LLM</small></li>
+            <li><span>06 / Evaluate</span><h3>Make it measurable.</h3><p>Text, retrieval, answer, and citation metrics with explicit quality gates.</p><small>Fixtures · gates · regressions</small></li>
+          </ol>
+          <div class="boundary-grid"><div class="boundary-panel"><span class="eyebrow">The real local product</span><h3>One trusted operator.</h3><p>The original Evidence Desk talks to an authenticated loopback JSON API. A separate worker handles durable SQLite jobs and a content-addressed artifact store.</p><a class="text-link" data-doc="docs/DEPLOYMENT.md" href="https://github.com/HivMindAI/PageTrace/blob/0de8da3556406c0b12d135fce806d1936e3cd9f6/docs/DEPLOYMENT.md" target="_blank" rel="noopener noreferrer">Local deployment boundary ↗</a></div><div class="boundary-panel demo-boundary"><span class="eyebrow">This public demonstration</span><h3>Static files. Browser interaction.</h3><p>A bundled two-page sample → browser BM25 illustration → exact excerpt or abstention. No server processing, accounts, database, API calls, or document uploads.</p><p class="small-copy">This is a separate presentation of documented features. It does not expose the local product.</p></div></div>
+        </section>
+
+        <section class="limits-section" aria-labelledby="limits-title"><div><span class="eyebrow">An honest scope</span><h2 id="limits-title">Evidence, with its limits in view.</h2><p>The fixture is deliberately small and synthetic. It is not a benchmark for real-world accuracy. Word overlap can retrieve an irrelevant excerpt; an exact citation does not prove a claim is true.</p></div><ul><li>No live ingestion, PDF parsing, OCR, or Python execution in this site.</li><li>No generated synthesis, semantic search, or cross-document reasoning.</li><li>Browser results are illustrative, not recorded Python evaluation results. JavaScript token normalization differs from Python casefolding.</li><li>No performance or general accuracy claims are made.</li></ul></section>
+        <footer><div><a class="footer-brand" href="#overview">PageTrace</a><span>Understand documents. Trace every answer to its source.</span></div><nav aria-label="Project resources"><a href="https://github.com/HivMindAI/PageTrace" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a data-doc="docs/PORTFOLIO.md" href="https://github.com/HivMindAI/PageTrace/blob/0de8da3556406c0b12d135fce806d1936e3cd9f6/docs/PORTFOLIO.md" target="_blank" rel="noopener noreferrer">Portfolio ↗</a><a data-doc="SECURITY.md" href="https://github.com/HivMindAI/PageTrace/blob/0de8da3556406c0b12d135fce806d1936e3cd9f6/SECURITY.md" target="_blank" rel="noopener noreferrer">Security ↗</a></nav><small>Prepared for Open Doors scholarship review · Static project demonstration</small></footer>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
